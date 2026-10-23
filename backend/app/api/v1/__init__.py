@@ -1,8 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, health, users
+from app.api.v1 import auth, health, payment_occurrences, payments_summary, recurring_payments, users
 
 router = APIRouter()
 router.include_router(health.router)
 router.include_router(auth.router)
+router.include_router(recurring_payments.router)
+router.include_router(payment_occurrences.router)
+router.include_router(payments_summary.router)
 router.include_router(users.router)

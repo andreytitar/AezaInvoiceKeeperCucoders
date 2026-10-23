@@ -12,6 +12,13 @@ RID = str(uuid.uuid4())
 MATRIX = [
     ("GET", "/api/v1/auth/me", None, True),
     ("POST", "/api/v1/auth/logout", None, True),
+    ("GET", "/api/v1/recurring-payments", None, True),
+    ("POST", "/api/v1/recurring-payments", {"title": "T", "amount": "1.00", "currency": "RUB", "first_due_date": "2026-11-01"}, False),
+    ("DELETE", f"/api/v1/recurring-payments/{RID}", None, False),
+    ("GET", "/api/v1/payment-occurrences", None, True),
+    ("GET", f"/api/v1/payment-occurrences/{RID}", None, True),
+    ("PATCH", f"/api/v1/payment-occurrences/{RID}", {"status": "paid"}, True),
+    ("GET", "/api/v1/payments/summary", None, True),
     ("GET", "/api/v1/users", None, False),
     ("POST", "/api/v1/users", {"login": "newbie", "password": "secret1"}, False),
     ("PATCH", f"/api/v1/users/{RID}", {"email": "a@b.cd"}, False),

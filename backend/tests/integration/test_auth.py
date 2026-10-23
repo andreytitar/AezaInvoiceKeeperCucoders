@@ -91,3 +91,9 @@ def test_user_login(user):
 
 def test_regular_user_password(app, regular_user):
     login_client(app, "ivan", USER_PASSWORD)
+
+
+def test_session_expires(container, app, clock):
+    c = login_client(app, ADMIN_LOGIN, ADMIN_PASSWORD)
+    clock.advance(hours=container.settings.session_ttl_hours + 1)
+    assert c.get("/api/v1/auth/me").status_code == 401
