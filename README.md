@@ -480,7 +480,49 @@ worker_heartbeat, app_meta
   (только http/https, запрет внутренних адресов, переключается `WEBHOOK_ALLOW_PRIVATE`), секрет зашифрован (Fernet)
 - [x] **Другие каналы**: Slack/Discord/Mattermost incoming webhook (`CHAT_WEBHOOK_URL`), подключается без
   изменений в ядре; Telegram, email и webhook используют тот же `NotificationChannel`; инструкция «как добавить свой канал»
+- [x] **Проработанный UX**: дашборд «просрочено / ближайшие 7 дней / оплачено недавно» с отметкой в один клик,
+  карточки по валютам, поиск, сортировка, фильтры запоминаются, статусы не только цветом (штамп, знаки ✓ ! ◆, текст),
+  загрузка/пустые состояния/ошибки/toast, подтверждения опасных действий, карточки вместо таблиц на телефоне,
+  тёмная тема (по системной настройке или переключателем), фокус и aria, суммы через `Intl.NumberFormat`,
+  русские даты. Дизайн-система — [`DESIGN.md`](DESIGN.md)
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
+
+## Требование → где реализовано → чем проверено
+
+| Требование | Где | Проверка |
+|---|---|---|
+| Запуск одной командой, миграции и сид автоматически | `docker-compose.yml`, `backend/docker-entrypoint.sh`, `app/bootstrap.py` | запуск из чистого клона, `scripts/acceptance.py` |
+| Без авторизации данные недоступны | `api/deps.py` (`get_auth`), `App.tsx` (`Protected`) | `test_permissions_matrix.py` (401 на каждый эндпоинт) |
+| Пользователь не выполнит действия админа через API | `require_admin` в роутерах | `test_permissions_matrix.py` (403), `test_payments.py`, `acceptance.py` п. 2 |
+| Админ из `.env`, не управляется через API | `AuthService.sync_system_admin`, `UserService._get_manageable` | `test_users.py`, `test_auth.py`, `acceptance.py` п. 10 |
+| Периоды, следующий период с отдельным статусом, история | `domain/schedule.py`, `OccurrenceGenerator` | `test_schedule.py`, `test_payments.py` |
+| 31-е число, високосный год | `domain/schedule.py` | `test_schedule.py`, `test_recurrence_strategies.py` |
+| Отметка/отмена оплаты, дата очищается, не в будущем | `domain/status.py`, `OccurrenceService.mark` | `test_status.py`, `test_payments.py` |
+| Исправление даты убирает просрочку, срок не меняется | `domain/status.py` | `test_status.py`, `test_payments.py`, `acceptance.py` п. 5 |
+| Напоминание за ≥ 3 дня, без дублей, немедленно при позднем добавлении | `ReminderService`, `DeliveryDispatcher`, `notification_deliveries` | `tests/worker/test_reminders.py` |
+| Оплаченный / удалённый не напоминает | `_still_relevant`, `cancel_open_*` | `test_reminders.py` |
+| Валюты и итоги по каждой отдельно | `domain/money.py`, `SummaryService` | `test_payments.py`, `test_calendar_summary.py` |
+| Сохранность после перезапуска | volume `pgdata` | `docker compose down` / `up` вручную |
+| OpenAPI и Swagger | `app/openapi_dump.py`, `/api/v1/docs` | `test_openapi_file.py` |
+| Аудит | `AuditService`, `/audit-logs` | `test_audit.py` |
+| Кнопка «Оплачено» в Telegram | `services/telegram_updates.py` | `test_telegram_button.py` |
+| Чеки | `ReceiptService`, `storage.py` | `test_receipts.py` |
+| Календарь, итоги на дату | `SummaryService.calendar`, `summary(as_of)` | `test_calendar_summary.py` |
+| Бюджеты | `BudgetService` | `test_budgets.py` |
+| Email | `channels/email.py` | `test_email_channel.py` |
+| Webhook | `channels/webhook.py`, `WebhookService` | `test_webhooks.py` |
+| Slack/Discord/Mattermost | `channels/chat_webhook.py` | `test_chat_webhook.py` |
+
+## Известные ограничения
+
+- Реальная отправка в Telegram проверена только против мок-API (`httpx.MockTransport`) и в режиме «лог вместо
+  отправки»; для живой проверки нужен токен бота и `chat_id`.
+- Rate limit входа хранится в памяти одного процесса api.
+- Доставка — «не больше одного успешного `sent`»; при падении worker между ответом внешнего API и записью
+  статуса возможен один повтор после таймаута.
+- Календарь, итоги на дату и бюджеты считаются по материализованным периодам (история + ближайший и следующий),
+  долгосрочный прогноз не строится.
+- SSRF-проверка вебхуков не закрывает DNS rebinding между проверкой и соединением.
 
 ## Переменные окружения
 

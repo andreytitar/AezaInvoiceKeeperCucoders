@@ -33,12 +33,12 @@ export function Layout() {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2 focus:bg-sheet">
         К содержимому
       </a>
-      <header className="border-b border-rule">
+      <header className="border-b border-rule relative">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-6">
           <NavLink to="/" className="font-serif text-xl font-bold tracking-tight whitespace-nowrap">
             Invoice<span className="text-red">·</span>Keeper
           </NavLink>
-          <nav className={`${menu ? 'flex' : 'hidden'} md:flex absolute md:static top-14 left-0 right-0 bg-paper md:bg-transparent border-b md:border-0 border-rule px-4 md:px-0 py-2 md:py-0 flex-col md:flex-row gap-2 md:gap-5 z-20`} aria-label="Разделы">
+          <nav className={`${menu ? 'flex' : 'hidden'} lg:flex absolute lg:static top-14 left-0 right-0 bg-paper lg:bg-transparent border-b lg:border-0 border-rule px-4 lg:px-0 py-2 lg:py-0 flex-col lg:flex-row gap-2 lg:gap-5 z-20`} aria-label="Разделы">
             {links.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.end} className={linkCls} onClick={() => setMenu(false)}>
                 {l.label}
@@ -46,7 +46,7 @@ export function Layout() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <span className="hidden sm:inline text-sm text-ink-soft">
+            <span className="hidden xl:inline text-sm text-ink-soft">
               {me?.login}
               {isAdmin && <span className="ml-1 num text-xs uppercase">[admin]</span>}
             </span>
@@ -56,7 +56,7 @@ export function Layout() {
             <button className="btn btn-sm" onClick={logout}>
               Выйти
             </button>
-            <button className="btn btn-sm md:hidden" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Меню">
+            <button className="btn btn-sm lg:hidden" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Меню">
               ☰
             </button>
           </div>

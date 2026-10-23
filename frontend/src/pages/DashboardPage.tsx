@@ -4,6 +4,7 @@ import { MarkPaidDialog } from '../components/MarkPaidDialog'
 import { ReceiptDialog } from '../components/ReceiptDialog'
 import { OverdueCell, StatusCell } from '../components/Status'
 import { SummaryCards } from '../components/SummaryCards'
+import { Upcoming } from '../components/Upcoming'
 import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../components/ui'
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
@@ -51,6 +52,7 @@ export function DashboardPage() {
   const [unpaying, setUnpaying] = useState<Occurrence | null>(null)
   const [receiptFor, setReceiptFor] = useState<Occurrence | null>(null)
   const [busy, setBusy] = useState(false)
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     try {
@@ -98,6 +100,7 @@ export function DashboardPage() {
   const refresh = () => {
     list.reload()
     summary.reload()
+    setVersion((v) => v + 1)
   }
 
   const markPaid = async (o: Occurrence, paidDate: string) => {
@@ -161,6 +164,8 @@ export function DashboardPage() {
       ) : (
         <Loading />
       )}
+
+      <Upcoming today={today} version={version} busy={busy} onPay={(o) => markPaid(o, today)} />
 
       <div className="flex flex-wrap gap-x-1 gap-y-2 mb-3" role="tablist" aria-label="Что показать">
         {TABS.map((t) => (
@@ -246,7 +251,39 @@ export function DashboardPage() {
             hint={hasExtraFilters ? 'Попробуйте сбросить фильтры' : undefined}
           />
         ) : (
-          <table className={`ledger w-full min-w-[760px] ${list.loading ? 'opacity-60' : ''}`}>
+          <>
+          <ul className={`md:hidden divide-y divide-rule ${list.loading ? 'opacity-60' : ''}`}>
+            {list.data.items.map((o) => (
+              <li key={o.id} className="p-3">
+                <div className="flex justify-between gap-3">
+                  <span className="font-semibold">{o.title}</span>
+                  <span className="num whitespace-nowrap">{formatMoney(o.amount, o.currency)}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
+                  <span className="num text-ink-soft">срок {formatDate(o.due_date)}</span>
+                  <StatusCell o={o} />
+                  <OverdueCell o={o} />
+                </div>
+                {o.paid_date && <p className="text-xs text-ink-soft mt-1 num">оплачено {formatDate(o.paid_date)}</p>}
+                {o.recurring_payment_deleted && <p className="text-xs text-ink-soft">платёж прекращён</p>}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {o.status === 'unpaid' ? (
+                    <>
+                      <button className="btn btn-sm btn-primary" onClick={() => markPaid(o, today)} disabled={busy}>Оплачено</button>
+                      <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy}>Дата…</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy}>Изменить дату</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => setUnpaying(o)} disabled={busy}>Отменить оплату</button>
+                    </>
+                  )}
+                  <button className="btn btn-sm btn-ghost" onClick={() => setReceiptFor(o)}>{o.has_receipt ? 'Чек ✓' : 'Чек'}</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <table className={`ledger hidden md:table w-full min-w-[760px] ${list.loading ? 'opacity-60' : ''}`}>
             <thead>
               <tr>
                 <th aria-sort={ariaSort('title')}>
@@ -328,6 +365,7 @@ export function DashboardPage() {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
