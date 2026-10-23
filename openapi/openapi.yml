@@ -474,7 +474,9 @@ paths:
     get:
       tags:
       - payments
-      summary: Итоги по валютам (без конвертации)
+      summary: Итоги по валютам (без конвертации), в том числе на дату
+      description: '`as_of` — дата, на которую считаются итоги: оплачено (`paid_date ≤ as_of`), просрочено на эту дату, предстоит.
+        По умолчанию — сегодня в APP_TIMEZONE.'
       operationId: summary_api_v1_payments_summary_get
       security:
       - OAuth2PasswordBearer: []
@@ -501,6 +503,17 @@ paths:
           description: Срок периода не позже
           title: To
         description: Срок периода не позже
+      - name: as_of
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          description: Итоги на дату (YYYY-MM-DD)
+          title: As Of
+        description: Итоги на дату (YYYY-MM-DD)
       responses:
         '200':
           description: Successful Response
@@ -508,6 +521,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SummaryOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/payments/calendar:
+    get:
+      tags:
+      - payments
+      summary: 'Календарь оплат: периоды по дням со статусами и суммами по валютам'
+      description: Диапазон не больше 92 дней. В ответ попадают только дни, на которые есть периоды.
+      operationId: calendar_api_v1_payments_calendar_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+          title: From
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+          title: To
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarOut'
         '401':
           description: Не авторизован
           content:
@@ -1120,6 +1176,55 @@ components:
       - username
       - password
       title: Body_token_api_v1_auth_token_post
+    CalendarDayOut:
+      properties:
+        date:
+          type: string
+          format: date
+          title: Date
+        occurrences:
+          items:
+            $ref: '#/components/schemas/OccurrenceOut'
+          type: array
+          title: Occurrences
+        totals:
+          items:
+            $ref: '#/components/schemas/CurrencySummaryOut'
+          type: array
+          title: Totals
+          description: Итоги дня по валютам (только валюты, которые есть в этот день)
+      type: object
+      required:
+      - date
+      - occurrences
+      - totals
+      title: CalendarDayOut
+    CalendarOut:
+      properties:
+        from:
+          type: string
+          format: date
+          title: From
+        to:
+          type: string
+          format: date
+          title: To
+        today:
+          type: string
+          format: date
+          title: Today
+        days:
+          items:
+            $ref: '#/components/schemas/CalendarDayOut'
+          type: array
+          title: Days
+      type: object
+      required:
+      - from
+      - to
+      - today
+      - days
+      title: CalendarOut
     Currency:
       type: string
       enum:
@@ -1139,7 +1244,10 @@ components:
           $ref: '#/components/schemas/MoneyBucket'
         overdue:
           $ref: '#/components/schemas/MoneyBucket'
-          description: Не оплачено и срок прошёл
+          description: На дату as_of не оплачено и срок прошёл
+        upcoming:
+          $ref: '#/components/schemas/MoneyBucket'
+          description: На дату as_of не оплачено и срок ещё не наступил
       type: object
       required:
       - currency
@@ -1147,6 +1255,7 @@ components:
       - paid
       - unpaid
       - overdue
+      - upcoming
       title: CurrencySummaryOut
     ErrorBody:
       properties:

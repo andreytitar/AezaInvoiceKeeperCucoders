@@ -129,9 +129,25 @@ class CurrencySummaryOut(OutputModel):
     total: MoneyBucket
     paid: MoneyBucket
     unpaid: MoneyBucket
-    overdue: MoneyBucket = Field(description="Не оплачено и срок прошёл")
+    overdue: MoneyBucket = Field(description="На дату as_of не оплачено и срок прошёл")
+    upcoming: MoneyBucket = Field(description="На дату as_of не оплачено и срок ещё не наступил")
 
 
 class SummaryOut(OutputModel):
     as_of: date
     currencies: list[CurrencySummaryOut]
+
+
+class CalendarDayOut(OutputModel):
+    date: date
+    occurrences: list[OccurrenceOut]
+    totals: list[CurrencySummaryOut] = Field(description="Итоги дня по валютам (только валюты, которые есть в этот день)")
+
+
+class CalendarOut(OutputModel):
+    date_from: date = Field(alias="from")
+    to: date
+    today: date
+    days: list[CalendarDayOut]
+
+    model_config = {"populate_by_name": True, "from_attributes": True, "serialize_by_alias": True}

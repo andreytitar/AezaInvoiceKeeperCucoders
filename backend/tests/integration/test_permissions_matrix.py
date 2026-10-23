@@ -19,6 +19,8 @@ MATRIX = [
     ("GET", f"/api/v1/payment-occurrences/{RID}", None, True),
     ("PATCH", f"/api/v1/payment-occurrences/{RID}", {"status": "paid"}, True),
     ("GET", "/api/v1/payments/summary", None, True),
+    ("GET", "/api/v1/payments/summary?as_of=2026-10-01", None, True),
+    ("GET", "/api/v1/payments/calendar?from=2026-10-01&to=2026-10-31", None, True),
     ("GET", f"/api/v1/payment-occurrences/{RID}/receipt", None, True),
     ("PUT", f"/api/v1/payment-occurrences/{RID}/receipt", None, True),
     ("DELETE", f"/api/v1/payment-occurrences/{RID}/receipt", None, True),

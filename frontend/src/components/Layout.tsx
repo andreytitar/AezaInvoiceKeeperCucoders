@@ -17,6 +17,7 @@ export function Layout() {
   }
   const links = [
     { to: '/', label: 'Платежи', end: true },
+    { to: '/calendar', label: 'Календарь', end: false },
     ...(isAdmin
       ? [
           { to: '/recurring', label: 'Регулярные платежи', end: false },

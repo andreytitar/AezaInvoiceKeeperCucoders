@@ -20,6 +20,10 @@ export function SummaryCards({ summary }: { summary: Summary }) {
           </p>
           <p className="text-xs text-ink-soft">к оплате · {c.unpaid.count} пер.</p>
           <dl className="mt-3 text-sm grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
+            <dt className="text-ink-soft">Предстоит</dt>
+            <dd className="num text-right">
+              {formatMoney(c.upcoming.amount, c.currency)} <span className="text-ink-soft">/{c.upcoming.count}</span>
+            </dd>
             <dt className={c.overdue.count ? 'text-red' : 'text-ink-soft'}>Просрочено</dt>
             <dd className={`num text-right ${c.overdue.count ? 'text-red font-semibold' : ''}`}>
               {formatMoney(c.overdue.amount, c.currency)} <span className="text-ink-soft">/{c.overdue.count}</span>

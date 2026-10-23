@@ -178,8 +178,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Итоги по валютам (без конвертации) */
+        /**
+         * Итоги по валютам (без конвертации), в том числе на дату
+         * @description `as_of` — дата, на которую считаются итоги: оплачено (`paid_date ≤ as_of`), просрочено на эту дату, предстоит. По умолчанию — сегодня в APP_TIMEZONE.
+         */
         get: operations["summary_api_v1_payments_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Календарь оплат: периоды по дням со статусами и суммами по валютам
+         * @description Диапазон не больше 92 дней. В ответ попадают только дни, на которые есть периоды.
+         */
+        get: operations["calendar_api_v1_payments_calendar_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -364,6 +387,41 @@ export interface components {
              */
             client_secret?: string | null;
         };
+        /** CalendarDayOut */
+        CalendarDayOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Occurrences */
+            occurrences: components["schemas"]["OccurrenceOut"][];
+            /**
+             * Totals
+             * @description Итоги дня по валютам (только валюты, которые есть в этот день)
+             */
+            totals: components["schemas"]["CurrencySummaryOut"][];
+        };
+        /** CalendarOut */
+        CalendarOut: {
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Days */
+            days: components["schemas"]["CalendarDayOut"][];
+        };
         /**
          * Currency
          * @enum {string}
@@ -375,8 +433,10 @@ export interface components {
             total: components["schemas"]["MoneyBucket"];
             paid: components["schemas"]["MoneyBucket"];
             unpaid: components["schemas"]["MoneyBucket"];
-            /** @description Не оплачено и срок прошёл */
+            /** @description На дату as_of не оплачено и срок прошёл */
             overdue: components["schemas"]["MoneyBucket"];
+            /** @description На дату as_of не оплачено и срок ещё не наступил */
+            upcoming: components["schemas"]["MoneyBucket"];
         };
         /** ErrorBody */
         ErrorBody: {
@@ -1224,6 +1284,8 @@ export interface operations {
                 from?: string | null;
                 /** @description Срок периода не позже */
                 to?: string | null;
+                /** @description Итоги на дату (YYYY-MM-DD) */
+                as_of?: string | null;
             };
             header?: never;
             path?: never;
@@ -1238,6 +1300,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    calendar_api_v1_payments_calendar_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
                 };
             };
             /** @description Не авторизован */
