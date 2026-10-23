@@ -29,10 +29,18 @@ class Container:
 
 def build_container(settings: Settings | None = None) -> Container:
     settings = settings or get_settings()
+    session_factory = get_session_factory()
+
+    def user_emails() -> list[str]:
+        from app.repositories.users import UserRepository
+
+        with session_factory() as db:
+            return UserRepository(db).active_emails()
+
     return Container(
         settings=settings,
         clock=SystemClock(settings.tz, settings.app_fake_today),
-        session_factory=get_session_factory(),
+        session_factory=session_factory,
         rate_limiter=LoginRateLimiter(settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds),
-        channels=build_channels(settings),
+        channels=build_channels(settings, user_emails),
     )

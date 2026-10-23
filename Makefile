@@ -1,6 +1,7 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down logs test seed openapi frontend-types ps restart clean
+
+.PHONY: up up-mail down logs test seed openapi frontend-types ps restart clean
 
 up:            ## Собрать и запустить (app, worker, db)
 	$(COMPOSE) up --build -d
@@ -8,6 +9,9 @@ up:            ## Собрать и запустить (app, worker, db)
 
 down:          ## Остановить (данные сохраняются)
 	$(COMPOSE) down
+
+up-mail:       ## То же + Mailpit (http://localhost:8025); в .env SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_SECURITY=none
+	$(COMPOSE) --profile demo-mail up --build -d
 
 logs:
 	$(COMPOSE) logs -f app worker

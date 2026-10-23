@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     telegram_api_base: str = "https://api.telegram.org"
     telegram_polling_enabled: bool = True
 
+    # --- Email (SMTP) ---
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "Invoice Keeper <invoice-keeper@localhost>"
+    smtp_security: str = Field(default="starttls", pattern="^(starttls|ssl|none)$")
+    smtp_timeout_seconds: float = 15.0
+    email_recipients: str = ""  # общий список через запятую
+    email_to_users: bool = True  # плюс email из профилей пользователей
+
     # --- Сид ---
     seed_on_start: bool = True
     seed_user_password: str = Field(default="user12345", min_length=6)
@@ -60,7 +71,10 @@ class Settings(BaseSettings):
             raise ValueError(f"Неизвестный часовой пояс APP_TIMEZONE={v!r}") from exc
         return v
 
-    @field_validator("telegram_bot_token", "telegram_chat_id", "app_fake_today", mode="before")
+    @field_validator(
+        "telegram_bot_token", "telegram_chat_id", "app_fake_today", "smtp_host", "smtp_user", "smtp_password",
+        mode="before",
+    )
     @classmethod
     def _empty_is_none(cls, v):
         if isinstance(v, str) and not v.strip():
@@ -70,6 +84,10 @@ class Settings(BaseSettings):
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.app_timezone)
+
+    @property
+    def email_static_recipients(self) -> list[str]:
+        return [e.strip() for e in self.email_recipients.split(",") if e.strip()]
 
     @property
     def telegram_enabled(self) -> bool:

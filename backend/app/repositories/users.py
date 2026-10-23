@@ -36,6 +36,15 @@ class UserRepository:
     def list_system(self) -> list[User]:
         return list(self.db.scalars(select(User).where(User.is_system.is_(True), User.deleted_at.is_(None))))
 
+    def active_emails(self) -> list[str]:
+        return [
+            e
+            for e in self.db.scalars(
+                select(User.email).where(User.deleted_at.is_(None), User.email.is_not(None)).order_by(User.login)
+            )
+            if e
+        ]
+
     def add(self, user: User) -> User:
         self.db.add(user)
         self.db.flush()

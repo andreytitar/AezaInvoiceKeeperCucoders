@@ -118,6 +118,25 @@ docker compose up --build
 Нажатия принимает worker через long polling (`TELEGRAM_POLLING_ENABLED=true`), смещение хранится в БД.
 У бота не должно быть установленного webhook (`deleteWebhook`), иначе long polling не работает.
 
+### Email-оповещения
+
+Напоминание дублируется письмом с тем же содержимым (название, сумма, валюта, дата) — тем же механизмом
+доставки (без дублей, с ретраями). Получатели: общий список `EMAIL_RECIPIENTS` и (при `EMAIL_TO_USERS=true`)
+email из профилей пользователей. Для демо есть Mailpit:
+
+```bash
+# в .env
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_SECURITY=none
+EMAIL_RECIPIENTS=team@example.com
+
+docker compose --profile demo-mail up -d     # или make up-mail
+open http://localhost:8025                   # входящие письма
+```
+
+Для настоящего SMTP задайте `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURITY=starttls|ssl`.
+
 ## Сценарий демонстрации
 
 Проходит вживую на чистой установке:
@@ -259,7 +278,7 @@ curl -s localhost:8000/api/v1/payments/summary -H "Authorization: Bearer $TOKEN"
                     │  • тик раз в 60 с            │
                     │  • генерация периодов        │───► Telegram Bot API
                     │  • постановка напоминаний    │
-                    │  • доставка + ретраи         │
+                    │  • доставка + ретраи         │───► SMTP (Mailpit в демо)
                     │  • long polling Telegram     │◄── нажатия «Оплачено»
                     └──────────────────────────────┘
 ```
@@ -391,6 +410,8 @@ worker_heartbeat, app_meta
 - [x] **Бюджет на месяц и год**: таблица `budgets` (тип, год, месяц, валюта, плановая сумма), `PUT/GET/DELETE
   /api/v1/budgets` (менять — admin, смотреть — все) и `GET /api/v1/budgets/report` — запланировано, оплачено,
   остаток, превышение по каждой валюте. В панели — шкалы прогресса и предупреждение о превышении
+- [x] **Email через SMTP**: канал `email` (`NotificationChannel`), письмо text + HTML, общий список и email
+  пользователей, тот же UNIQUE/ретраи/без дублей; Mailpit в профиле `demo-mail`; тесты с мок-SMTP
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения

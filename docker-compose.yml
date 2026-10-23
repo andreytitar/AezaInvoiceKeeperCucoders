@@ -51,6 +51,15 @@ services:
         condition: service_healthy
     stop_grace_period: 30s
 
+  # Демо-почта: docker compose --profile demo-mail up -d  ->  веб-интерфейс http://localhost:8025
+  # (в .env: SMTP_HOST=mailpit, SMTP_PORT=1025, SMTP_SECURITY=none)
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["demo-mail"]
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+
   # Тесты: docker compose --profile test run --rm tests   (или make test)
   tests:
     build:
