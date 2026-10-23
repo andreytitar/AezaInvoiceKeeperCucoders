@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
+import { AuditPage } from './pages/AuditPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { RecurringPaymentsPage } from './pages/RecurringPaymentsPage'
@@ -33,6 +34,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="recurring" element={<Protected admin><RecurringPaymentsPage /></Protected>} />
               <Route path="users" element={<Protected admin><UsersPage /></Protected>} />
+              <Route path="audit" element={<Protected admin><AuditPage /></Protected>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

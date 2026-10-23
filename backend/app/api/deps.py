@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.container import Container
 from app.domain.errors import Forbidden, Unauthorized
+from app.infrastructure.request_context import request_context
 from app.models import Role, Session, User
 from app.services.auth import AuthService
 
@@ -78,6 +79,10 @@ def get_auth(
     if via_cookie and request.method in UNSAFE_METHODS and not _origin_matches_host(request):
         raise Forbidden("Запрос с чужого источника отклонён (CSRF)", code="csrf_failed")
     request.state.user = user
+    ctx = request_context.get()
+    if ctx is not None:
+        ctx.actor_id = user.id
+        ctx.actor_login = user.login
     return CurrentAuth(user=user, session=session, via_cookie=via_cookie)
 
 

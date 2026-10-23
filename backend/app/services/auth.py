@@ -21,6 +21,7 @@ from app.infrastructure.security import (
 )
 from app.models import Role, Session, User
 from app.repositories.users import SessionRepository, UserRepository
+from app.services.audit import AuditService
 
 log = logging.getLogger("app.auth")
 
@@ -45,6 +46,8 @@ class AuthService:
         if self.limiter:
             retry = self.limiter.retry_after(ip, login)
             if retry is not None:
+                AuditService(self.db, self.clock).log("auth.login_blocked", entity_type="user", actor_login=login[:64])
+                self.db.commit()
                 raise TooManyRequests(
                     "Слишком много неудачных попыток входа, попробуйте позже",
                     details={"retry_after_seconds": retry},
@@ -54,6 +57,8 @@ class AuthService:
             if self.limiter:
                 self.limiter.register_failure(ip, login)
             log.info("Неудачный вход", extra={"login": login, "ip": ip})
+            AuditService(self.db, self.clock).log("auth.login_failed", entity_type="user", actor_login=login[:64])
+            self.db.commit()
             raise Unauthorized("Неверный логин или пароль", code="invalid_credentials")
         if self.limiter:
             self.limiter.reset(ip, login)
@@ -71,6 +76,7 @@ class AuthService:
                 last_seen_at=now,
             )
         )
+        AuditService(self.db, self.clock).log("auth.login", entity_type="user", entity_id=user.id, actor=user)
         self.db.commit()
         log.info("Успешный вход", extra={"login": user.login, "ip": ip})
         return LoginResult(user=user, token=token, session=session)
@@ -90,6 +96,7 @@ class AuthService:
 
     def logout(self, session: Session) -> None:
         session.revoked_at = self.clock.now()
+        AuditService(self.db, self.clock).log("auth.logout", entity_type="user", entity_id=session.user_id, actor=session.user)
         self.db.commit()
 
     def sync_system_admin(self) -> User:

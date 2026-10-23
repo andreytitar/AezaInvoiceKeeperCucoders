@@ -14,6 +14,7 @@ from app.api.errors import install_error_handlers
 from app.api.v1 import router as v1_router
 from app.container import Container, build_container
 from app.infrastructure.logging import request_id_var, setup_logging
+from app.infrastructure.request_context import RequestContext, request_context
 
 API_PREFIX = "/api/v1"
 
@@ -43,10 +44,17 @@ def create_app(container: Container | None = None) -> FastAPI:
     async def request_id_middleware(request: Request, call_next):
         rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         token = request_id_var.set(rid)
+        ctx_token = request_context.set(
+            RequestContext(
+                ip=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+        )
         try:
             response = await call_next(request)
         finally:
             request_id_var.reset(token)
+            request_context.reset(ctx_token)
         response.headers["X-Request-ID"] = rid
         return response
 

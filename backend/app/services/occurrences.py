@@ -16,6 +16,7 @@ from app.domain.status import PaymentStatus, apply_status_change
 from app.models import PaymentOccurrence, RecurringPayment, User
 from app.repositories.deliveries import DeliveryRepository
 from app.repositories.payments import OccurrenceFilter, OccurrenceRepository, PaymentRepository
+from app.services.audit import AuditService, occurrence_snapshot
 
 
 class OccurrenceGenerator:
@@ -84,6 +85,7 @@ class OccurrenceService:
         paid_date: date | None,
         paid_date_provided: bool,
         actor: User | None,
+        actor_login: str | None = None,
     ) -> PaymentOccurrence:
         """Подтверждение/отмена оплаты конкретного периода (раздел 2.3). Идемпотентно."""
         occ = self.occurrences.get_for_update(occurrence_id)
@@ -98,10 +100,20 @@ class OccurrenceService:
             today=self.clock.today(),
         )
         changed = (occ.is_paid, occ.paid_date) != (mark.is_paid, mark.paid_date)
+        before = occurrence_snapshot(occ)
+        was_paid = occ.is_paid
         occ.is_paid = mark.is_paid
         occ.paid_date = mark.paid_date
         if changed:
             occ.updated_by = actor.id if actor else None
+            if mark.is_paid and was_paid:
+                action = "occurrence.paid_date_changed"
+            else:
+                action = "occurrence.paid" if mark.is_paid else "occurrence.unpaid"
+            AuditService(self.db, self.clock).log(
+                action, entity_type="payment_occurrence", entity_id=occ.id, before=before,
+                after=occurrence_snapshot(occ), actor=actor, actor_login=actor_login,
+            )
         if mark.is_paid:
             self.deliveries.cancel_open_for_occurrence(occ.id)
         elif occ.payment.deleted_at is None:

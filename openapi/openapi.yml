@@ -695,8 +695,213 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit-logs:
+    get:
+      tags:
+      - audit
+      summary: Журнал действий (admin)
+      description: Вход/выход, платежи, отметки оплаты, пользователи, отправки уведомлений. Новые записи сверху.
+      operationId: list_audit_logs_api_v1_audit_logs_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: action
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          description: Префикс действия, например `occurrence.` или `auth.login`
+          title: Action
+        description: Префикс действия, например `occurrence.` или `auth.login`
+      - name: entity_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Entity Type
+      - name: entity_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Entity Id
+      - name: actor_login
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Actor Login
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          description: С даты (в APP_TIMEZONE)
+          title: From
+        description: С даты (в APP_TIMEZONE)
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          description: По дату включительно (в APP_TIMEZONE)
+          title: To
+        description: По дату включительно (в APP_TIMEZONE)
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Page Size
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogPage'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    AuditLogOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        at:
+          type: string
+          format: date-time
+          title: At
+        actor_user_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Actor User Id
+        actor_login:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor Login
+        action:
+          type: string
+          title: Action
+        entity_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Type
+        entity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Id
+        before:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Before
+        after:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: After
+        ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ip
+        user_agent:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Agent
+      type: object
+      required:
+      - id
+      - at
+      - actor_user_id
+      - actor_login
+      - action
+      - entity_type
+      - entity_id
+      - before
+      - after
+      - ip
+      - user_agent
+      title: AuditLogOut
+    AuditLogPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AuditLogOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        page_size:
+          type: integer
+          title: Page Size
+      type: object
+      required:
+      - items
+      - total
+      - page
+      - page_size
+      title: AuditLogPage
     Body_token_api_v1_auth_token_post:
       properties:
         grant_type:

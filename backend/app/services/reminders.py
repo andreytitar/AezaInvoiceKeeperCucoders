@@ -23,6 +23,7 @@ from app.domain.reminder_policy import days_until, reminder_window_end, should_r
 from app.infrastructure.channels.base import ChannelRegistry, Notification, SendResult
 from app.models import DeliveryKind, DeliveryStatus, NotificationDelivery, PaymentOccurrence
 from app.repositories.reminders import ReminderRepository
+from app.services.audit import AuditService
 
 log = logging.getLogger("app.reminders")
 
@@ -199,6 +200,14 @@ class DeliveryDispatcher:
                 d.next_attempt_at = now + backoff_delay(d.attempts)
                 stats.failed += 1
                 log.warning("Ошибка доставки %s, попытка %s: %s", d.id, d.attempts, d.last_error)
+            if d.status in (DeliveryStatus.SENT, DeliveryStatus.DEAD):
+                AuditService(db, self.clock).log(
+                    "notification.sent" if d.status == DeliveryStatus.SENT else "notification.dead",
+                    entity_type="payment_occurrence",
+                    entity_id=d.occurrence_id,
+                    after={"channel": d.channel, "recipient": d.recipient, "kind": d.kind, "attempts": d.attempts, "error": d.last_error},
+                    actor_login="worker",
+                )
             db.commit()
             if result.ok and self.on_sent:
                 self.on_sent(db, d, message)

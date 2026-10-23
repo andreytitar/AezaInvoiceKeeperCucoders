@@ -52,6 +52,6 @@ def create_payment(
     "с признаком `recurring_payment_deleted`. Повторный DELETE возвращает 404.",
     responses=responses(401, 403, 404),
 )
-def delete_payment(payment_id: uuid.UUID, _: AdminDep, c: ContainerDep, db: DbDep) -> Response:
-    PaymentService(db, c.clock, c.settings).delete(payment_id)
+def delete_payment(payment_id: uuid.UUID, admin: AdminDep, c: ContainerDep, db: DbDep) -> Response:
+    PaymentService(db, c.clock, c.settings).delete(payment_id, actor=admin)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

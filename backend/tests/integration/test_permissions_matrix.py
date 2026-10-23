@@ -20,6 +20,7 @@ MATRIX = [
     ("PATCH", f"/api/v1/payment-occurrences/{RID}", {"status": "paid"}, True),
     ("GET", "/api/v1/payments/summary", None, True),
     ("GET", "/api/v1/users", None, False),
+    ("GET", "/api/v1/audit-logs", None, False),
     ("POST", "/api/v1/users", {"login": "newbie", "password": "secret1"}, False),
     ("PATCH", f"/api/v1/users/{RID}", {"email": "a@b.cd"}, False),
     ("DELETE", f"/api/v1/users/{RID}", None, False),

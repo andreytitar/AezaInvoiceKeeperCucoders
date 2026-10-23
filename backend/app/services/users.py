@@ -12,6 +12,7 @@ from app.domain.errors import Conflict, Forbidden, NotFound
 from app.infrastructure.security import hash_password
 from app.models import Role, User
 from app.repositories.users import SessionRepository, UserRepository
+from app.services.audit import AuditService, user_snapshot
 
 _UNSET = object()
 
@@ -62,6 +63,7 @@ class UserService:
                 telegram_user_id=telegram_user_id,
             )
         )
+        AuditService(self.db, self.clock).log("user.create", entity_type="user", entity_id=user.id, after=user_snapshot(user))
         self.db.commit()
         return user
 
@@ -75,6 +77,7 @@ class UserService:
         telegram_user_id=_UNSET,
     ) -> User:
         user = self._get_manageable(user_id)
+        before = user_snapshot(user)
         revoke = False
         if login is not _UNSET and login != user.login:
             self._ensure_login_free(login, exclude=user.id)
@@ -89,6 +92,10 @@ class UserService:
             user.telegram_user_id = telegram_user_id
         if revoke:
             self.sessions.revoke_all_for_user(user.id, self.clock.now())
+        AuditService(self.db, self.clock).log(
+            "user.update", entity_type="user", entity_id=user.id, before=before,
+            after={**user_snapshot(user), "password_changed": revoke},
+        )
         self.db.commit()
         return user
 
@@ -97,4 +104,5 @@ class UserService:
         now = self.clock.now()
         user.deleted_at = now
         self.sessions.revoke_all_for_user(user.id, now)
+        AuditService(self.db, self.clock).log("user.delete", entity_type="user", entity_id=user.id, before=user_snapshot(user))
         self.db.commit()

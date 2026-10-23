@@ -21,6 +21,7 @@ export function Layout() {
       ? [
           { to: '/recurring', label: 'Регулярные платежи', end: false },
           { to: '/users', label: 'Пользователи', end: false },
+          { to: '/audit', label: 'Журнал', end: false },
         ]
       : []),
   ]

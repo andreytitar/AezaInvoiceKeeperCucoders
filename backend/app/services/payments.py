@@ -18,6 +18,7 @@ from app.models import RecurringPayment, User
 from app.repositories.deliveries import DeliveryRepository
 from app.repositories.payments import OccurrenceRepository, PaymentRepository
 from app.services.occurrences import OccurrenceGenerator
+from app.services.audit import AuditService, payment_snapshot
 from app.services.reminders import ReminderService
 
 
@@ -71,6 +72,9 @@ class PaymentService:
         )
         OccurrenceGenerator(self.db, self.clock).ensure(payment)
         self._after_create(payment)
+        AuditService(self.db, self.clock).log(
+            "payment.create", entity_type="recurring_payment", entity_id=payment.id, after=payment_snapshot(payment), actor=actor
+        )
         self.db.commit()
         return payment
 
@@ -79,15 +83,24 @@ class PaymentService:
         if self.channels is not None:
             ReminderService(self.db, self.clock, self.settings, self.channels).scan(payment.id, commit=False)
 
-    def delete(self, payment_id: uuid.UUID) -> RecurringPayment:
+    def delete(self, payment_id: uuid.UUID, actor: User | None = None) -> RecurringPayment:
         """Прекращение: новые периоды не создаются, напоминаний больше нет, история сохраняется.
         Будущие неоплаченные периоды удаляются. Повторный DELETE -> 404."""
         payment = self.payments.get(payment_id)
         if payment is None:
             raise NotFound("Регулярный платёж не найден")
+        before = payment_snapshot(payment)
         payment.deleted_at = self.clock.now()
-        self.occurrences.delete_future_unpaid(payment.id, self.clock.today())
+        removed = self.occurrences.delete_future_unpaid(payment.id, self.clock.today())
         self.deliveries.cancel_open_for_payment(payment.id)
+        AuditService(self.db, self.clock).log(
+            "payment.delete",
+            entity_type="recurring_payment",
+            entity_id=payment.id,
+            before=before,
+            after={**payment_snapshot(payment), "future_unpaid_periods_removed": removed},
+            actor=actor,
+        )
         self.db.commit()
         return payment
 

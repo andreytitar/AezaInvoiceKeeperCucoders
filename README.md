@@ -190,6 +190,7 @@ Telegram — `FakeChannel` и `httpx.MockTransport`.
 | `PATCH /payment-occurrences/{id}` (только `status`, `paid_date`) | 401 | ✔ | ✔ |
 | `GET /payments/summary` | 401 | ✔ | ✔ |
 | `GET/POST/PATCH/DELETE /users` | 401 | 403 | ✔ (системный админ: 403) |
+| `GET /audit-logs` | 401 | 403 | ✔ |
 | `GET /health`, `/docs`, `/openapi.json` | ✔ | ✔ | ✔ |
 
 Документация и health открыты без авторизации: в них нет данных, а жюри удобнее смотреть схему сразу.
@@ -277,6 +278,7 @@ payment_occurrences   снимок title/amount/currency, due_date DATE, is_paid
                       UNIQUE(recurring_payment_id, due_date), CHECK(is_paid OR paid_date IS NULL), CHECK(NOT is_paid OR paid_date IS NOT NULL)
 notification_deliveries  occurrence_id, channel, recipient, kind, status, attempts, next_attempt_at, last_error, sent_at, locked_at
                       UNIQUE(occurrence_id, channel, recipient, kind)
+audit_logs            at, seq, actor_user_id, actor_login, action, entity_type, entity_id, before/after JSONB, ip, user_agent
 worker_heartbeat, app_meta
 ```
 
@@ -349,6 +351,10 @@ worker_heartbeat, app_meta
 
 Сверх обязательной части:
 
+- [x] **Журнал действий** (`audit_logs`, `GET /api/v1/audit-logs`, страница «Журнал»): вход/неудачный вход/блокировка,
+  выход, создание и прекращение платежей, отметки и отмены оплаты, исправление даты (до/после), управление
+  пользователями (без паролей), отправленные и недоставленные уведомления; IP и user-agent. Пишется из сервисного
+  слоя в той же транзакции, что и изменение. Логи приложения — JSON с `request_id`, секреты маскируются
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения
