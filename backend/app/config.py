@@ -6,7 +6,7 @@ from datetime import date
 from functools import lru_cache
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -74,4 +74,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    try:
+        return Settings()  # type: ignore[call-arg]
+    except ValidationError as exc:
+        problems = []
+        for err in exc.errors():
+            name = str(err["loc"][0]).upper() if err["loc"] else "?"
+            problems.append(f"  {name}: {'не задана' if err['type'] == 'missing' else err['msg']}")
+        raise SystemExit("Ошибка конфигурации (.env):\n" + "\n".join(problems)) from None

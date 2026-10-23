@@ -27,9 +27,9 @@ def plain_text(n: Notification) -> str:
 
 
 def telegram_html(n: Notification) -> str:
-    icon = "⚠️" if n.days_until_due < 0 else "🔔"
+    head = "Просроченный платёж" if n.days_until_due < 0 else "Напоминание об оплате"
     return (
-        f"{icon} <b>Напоминание об оплате</b>\n\n"
+        f"<b>{head}</b>\n\n"
         f"<b>{html.escape(n.title)}</b>\n"
         f"Сумма: <b>{html.escape(format_amount(n.amount, n.currency))}</b> ({n.currency})\n"
         f"Дата оплаты: <b>{n.due_date:%d.%m.%Y}</b> — {due_phrase(n.days_until_due)}"

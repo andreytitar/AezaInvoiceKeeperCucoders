@@ -14,6 +14,10 @@ log = logging.getLogger("app.bootstrap")
 def bootstrap(container: Container) -> None:
     with container.session_factory() as db:
         AuthService(db, container.clock, container.settings).sync_system_admin()
+    if container.settings.seed_on_start:
+        from app.seed import run_seed
+
+        run_seed(container)
     if container.settings.app_fake_today:
         log.warning("Включён демо-режим APP_FAKE_TODAY=%s", container.settings.app_fake_today)
 

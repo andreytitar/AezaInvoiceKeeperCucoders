@@ -82,6 +82,7 @@ def settings():
         telegram_bot_token=None,
         telegram_chat_id="-100500",
         seed_user_password="user-pass-123",
+        seed_on_start=False,
         log_level="WARNING",
         session_ttl_hours=24 * 365 * 3,  # тесты двигают часы на месяцы вперёд
     )

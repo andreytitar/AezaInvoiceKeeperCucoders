@@ -186,3 +186,13 @@ class WorkerHeartbeat(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     last_tick_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_tick_ok: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AppMeta(Base):
+    """Служебные отметки (например, что сид уже применён)."""
+
+    __tablename__ = "app_meta"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
