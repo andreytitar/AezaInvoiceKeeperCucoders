@@ -1,3 +1,43 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Layout } from './components/Layout'
+import { Loading } from './components/ui'
+import { DashboardPage } from './pages/DashboardPage'
+import { LoginPage } from './pages/LoginPage'
+import { RecurringPaymentsPage } from './pages/RecurringPaymentsPage'
+import { UsersPage } from './pages/UsersPage'
+import { AuthProvider, useAuth } from './store/auth'
+import { ToastProvider } from './store/toast'
+
+function Protected({ admin = false, children }: { admin?: boolean; children: React.ReactNode }) {
+  const { me, loading, isAdmin } = useAuth()
+  if (loading) return <Loading />
+  if (!me) return <Navigate to="/login" replace />
+  if (admin && !isAdmin) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 export default function App() {
-  return <div className="p-8 text-xl">Invoice Keeper</div>
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              element={
+                <Protected>
+                  <Layout />
+                </Protected>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="recurring" element={<Protected admin><RecurringPaymentsPage /></Protected>} />
+              <Route path="users" element={<Protected admin><UsersPage /></Protected>} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
+  )
 }

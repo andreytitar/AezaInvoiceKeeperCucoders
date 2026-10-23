@@ -1,1 +1,181 @@
 @import "tailwindcss";
+@import "@fontsource/pt-serif/cyrillic-700.css";
+@import "@fontsource/pt-serif/latin-700.css";
+@import "@fontsource/ibm-plex-sans/cyrillic-400.css";
+@import "@fontsource/ibm-plex-sans/cyrillic-600.css";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-mono/cyrillic-400.css";
+@import "@fontsource/ibm-plex-mono/cyrillic-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+:root {
+  --paper: #f4efe4;
+  --sheet: #fbf8f1;
+  --ink: #1d1b17;
+  --ink-soft: #5d574c;
+  --rule: #cfc5b0;
+  --red: #b3261e;
+  --green: #2f5d3a;
+  --amber: #8a5a00;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --paper: #1c1a17;
+  --sheet: #24211d;
+  --ink: #ece6d8;
+  --ink-soft: #a89f8d;
+  --rule: #3d3830;
+  --red: #e5675d;
+  --green: #7fb88b;
+  --amber: #d9a441;
+  color-scheme: dark;
+}
+
+@theme {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-rule: var(--rule);
+  --color-red: var(--red);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --font-serif: 'PT Serif', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', Menlo, monospace;
+  --radius-sm: 2px;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* процедурное зерно бумаги, ~3% */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+@layer components {
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 0.35rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 120ms, background-color 120ms;
+  white-space: nowrap;
+}
+.btn:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:hover { background: color-mix(in srgb, var(--ink) 85%, var(--paper)); }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: color-mix(in srgb, var(--red) 9%, transparent); }
+.btn-sm { padding: 0.15rem 0.55rem; font-size: 0.8rem; }
+.btn-ghost { border-color: transparent; }
+
+.field {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-bottom: 1.5px solid var(--ink);
+  border-radius: 2px;
+  background: var(--sheet);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.field:focus { outline: 2px solid var(--ink); outline-offset: 0; }
+.label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: 0.25rem; }
+
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+/* штамп «оплачено» */
+.stamp {
+  display: inline-block;
+  transform: rotate(-4deg);
+  border: 1.5px solid var(--green);
+  outline: 1px solid var(--green);
+  outline-offset: 1.5px;
+  border-radius: 3px;
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0 0.35rem;
+  white-space: nowrap;
+}
+.overdue-ink {
+  color: var(--red);
+  text-decoration: underline wavy var(--red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.ledger th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1.5px solid var(--ink);
+}
+.ledger td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+.ledger tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.ledger th button { font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
+}
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fade-in 140ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

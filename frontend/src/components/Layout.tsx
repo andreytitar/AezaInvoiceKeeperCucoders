@@ -1,0 +1,66 @@
+import { useState } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../store/auth'
+import { applyTheme, loadTheme, type Theme } from '../theme/theme'
+
+const linkCls = ({ isActive }: { isActive: boolean }) =>
+  `px-1 py-1 text-sm border-b-2 ${isActive ? 'border-ink font-semibold' : 'border-transparent text-ink-soft hover:text-ink'}`
+
+export function Layout() {
+  const { me, logout, isAdmin } = useAuth()
+  const [theme, setTheme] = useState<Theme>(loadTheme())
+  const [menu, setMenu] = useState(false)
+  const toggleTheme = () => {
+    const t = theme === 'light' ? 'dark' : 'light'
+    setTheme(t)
+    applyTheme(t)
+  }
+  const links = [
+    { to: '/', label: 'Платежи', end: true },
+    ...(isAdmin
+      ? [
+          { to: '/recurring', label: 'Регулярные платежи', end: false },
+          { to: '/users', label: 'Пользователи', end: false },
+        ]
+      : []),
+  ]
+  return (
+    <div className="min-h-screen">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2 focus:bg-sheet">
+        К содержимому
+      </a>
+      <header className="border-b border-rule">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-6">
+          <NavLink to="/" className="font-serif text-xl font-bold tracking-tight whitespace-nowrap">
+            Invoice<span className="text-red">·</span>Keeper
+          </NavLink>
+          <nav className={`${menu ? 'flex' : 'hidden'} md:flex absolute md:static top-14 left-0 right-0 bg-paper md:bg-transparent border-b md:border-0 border-rule px-4 md:px-0 py-2 md:py-0 flex-col md:flex-row gap-2 md:gap-5 z-20`} aria-label="Разделы">
+            {links.map((l) => (
+              <NavLink key={l.to} to={l.to} end={l.end} className={linkCls} onClick={() => setMenu(false)}>
+                {l.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden sm:inline text-sm text-ink-soft">
+              {me?.login}
+              {isAdmin && <span className="ml-1 num text-xs uppercase">[admin]</span>}
+            </span>
+            <button className="btn btn-sm btn-ghost" onClick={toggleTheme} aria-label="Переключить тему">
+              {theme === 'light' ? 'Тёмная' : 'Светлая'}
+            </button>
+            <button className="btn btn-sm" onClick={logout}>
+              Выйти
+            </button>
+            <button className="btn btn-sm md:hidden" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Меню">
+              ☰
+            </button>
+          </div>
+        </div>
+      </header>
+      <main id="main" className="mx-auto max-w-6xl px-4 py-6">
+        <Outlet />
+      </main>
+    </div>
+  )
+}
