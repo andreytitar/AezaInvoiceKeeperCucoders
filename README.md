@@ -106,6 +106,18 @@ docker compose up --build
 Дата оплаты: 26.10.2026 — через 2 дн.
 ```
 
+### Кнопка «Оплачено» в Telegram
+
+Под каждым напоминанием есть inline-кнопка **«Оплачено»**. Нажатие отмечает период оплаченным
+сегодняшней датой (в `APP_TIMEZONE`) по тем же правилам, что и панель, и редактирует сообщение:
+«Оплачено …, отметил(а) ivan». Повторное нажатие ничего не ломает.
+
+Нажимать могут только привязанные аккаунты: администратор указывает **Telegram user ID** в профиле
+пользователя («Пользователи» → «Изменить»). Узнать свой id — написать [@userinfobot](https://t.me/userinfobot).
+Нажатие от непривязанного аккаунта отклоняется всплывающим сообщением, данные не меняются.
+Нажатия принимает worker через long polling (`TELEGRAM_POLLING_ENABLED=true`), смещение хранится в БД.
+У бота не должно быть установленного webhook (`deleteWebhook`), иначе long polling не работает.
+
 ## Сценарий демонстрации
 
 Проходит вживую на чистой установке:
@@ -244,6 +256,7 @@ curl -s localhost:8000/api/v1/payments/summary -H "Authorization: Bearer $TOKEN"
                     │  • генерация периодов        │───► Telegram Bot API
                     │  • постановка напоминаний    │
                     │  • доставка + ретраи         │
+                    │  • long polling Telegram     │◄── нажатия «Оплачено»
                     └──────────────────────────────┘
 ```
 
@@ -279,6 +292,7 @@ payment_occurrences   снимок title/amount/currency, due_date DATE, is_paid
 notification_deliveries  occurrence_id, channel, recipient, kind, status, attempts, next_attempt_at, last_error, sent_at, locked_at
                       UNIQUE(occurrence_id, channel, recipient, kind)
 audit_logs            at, seq, actor_user_id, actor_login, action, entity_type, entity_id, before/after JSONB, ip, user_agent
+telegram_updates_offset  last_update_id (long polling)
 worker_heartbeat, app_meta
 ```
 
@@ -355,6 +369,8 @@ worker_heartbeat, app_meta
   выход, создание и прекращение платежей, отметки и отмены оплаты, исправление даты (до/после), управление
   пользователями (без паролей), отправленные и недоставленные уведомления; IP и user-agent. Пишется из сервисного
   слоя в той же транзакции, что и изменение. Логи приложения — JSON с `request_id`, секреты маскируются
+- [x] **Кнопка «Оплачено» в Telegram**: inline-кнопка, привязка `telegram_user_id`, отказ непривязанным,
+  идемпотентность, редактирование сообщения «кто и когда», long polling в worker
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения

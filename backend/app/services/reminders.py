@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import Settings
 from app.domain.clock import Clock
 from app.domain.reminder_policy import days_until, reminder_window_end, should_remind
-from app.infrastructure.channels.base import ChannelRegistry, Notification, SendResult
+from app.infrastructure.channels.base import Action, ChannelRegistry, Notification, SendResult
 from app.models import DeliveryKind, DeliveryStatus, NotificationDelivery, PaymentOccurrence
 from app.repositories.reminders import ReminderRepository
 from app.services.audit import AuditService
@@ -107,6 +107,7 @@ class DeliveryDispatcher:
             due_date=occ.due_date,
             kind=DeliveryKind.REMINDER.value,
             days_until_due=days_until(occ.due_date, self.clock.today()),
+            actions=(Action("Оплачено", f"paid:{occ.id}"),),
         )
 
     def _still_relevant(self, d: NotificationDelivery, occ: PaymentOccurrence | None) -> bool:

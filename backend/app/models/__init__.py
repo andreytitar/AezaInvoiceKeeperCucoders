@@ -221,3 +221,12 @@ class AuditLog(Base):
     after: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class TelegramUpdatesOffset(Base):
+    """Смещение long polling Telegram: обработанные апдейты не обрабатываются повторно после рестарта."""
+
+    __tablename__ = "telegram_updates_offset"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_update_id: Mapped[int] = mapped_column(BigInteger)

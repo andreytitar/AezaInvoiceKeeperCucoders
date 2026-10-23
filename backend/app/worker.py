@@ -17,7 +17,9 @@ from sqlalchemy.dialects.postgresql import insert
 from app.container import Container, build_container
 from app.infrastructure.logging import setup_logging
 from app.models import WorkerHeartbeat
+from app.infrastructure.channels.telegram import TelegramClient
 from app.services.occurrences import OccurrenceGenerator
+from app.services.telegram_updates import TelegramUpdateHandler
 from app.services.reminders import ReminderService, make_dispatcher
 
 log = logging.getLogger("app.worker")
@@ -66,15 +68,25 @@ class Worker:
                 log.info("Жду готовности схемы БД…")
                 time.sleep(2)
 
+    def _start_telegram_polling(self) -> asyncio.Task | None:
+        s = self.c.settings
+        if not (s.telegram_enabled and s.telegram_polling_enabled):
+            return None
+        client = TelegramClient(s.telegram_bot_token or "", s.telegram_api_base)
+        return asyncio.create_task(TelegramUpdateHandler(self.c, client).poll_forever(self.stop_event))
+
     async def run(self) -> None:
         interval = self.c.settings.worker_interval_seconds
         log.info("Worker запущен, интервал %s с", interval)
+        polling = self._start_telegram_polling()
         while not self.stop_event.is_set():
             await self.tick()
             try:
                 await asyncio.wait_for(self.stop_event.wait(), timeout=interval)
             except TimeoutError:
                 pass
+        if polling:
+            polling.cancel()
         log.info("Worker остановлен")
 
 
