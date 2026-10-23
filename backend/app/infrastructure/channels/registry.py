@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from app.config import Settings
 from app.infrastructure.channels.base import ChannelRegistry
+from app.infrastructure.channels.chat_webhook import ChatWebhookChannel
 from app.infrastructure.channels.email import EmailChannel
 from app.infrastructure.channels.webhook import EndpointConfig, WebhookChannel
 from app.infrastructure.channels.telegram import LogTelegramChannel, TelegramChannel, TelegramClient
@@ -34,6 +35,13 @@ def build_channels(
     if settings.smtp_host:
         registry.register(EmailChannel(settings, user_emails))
         log.info("Email-канал включён: %s:%s", settings.smtp_host, settings.smtp_port)
+    if settings.chat_webhook_url:
+        chat = ChatWebhookChannel(
+            settings.chat_webhook_url, settings.chat_webhook_format, settings.webhook_allow_private,
+            settings.webhook_timeout_seconds,
+        )
+        registry.register(chat)
+        log.info("Чат-вебхук включён (формат %s)", chat.fmt)
     if webhook_endpoints is not None:
         registry.register(
             WebhookChannel(webhook_endpoints, settings.webhook_allow_private, settings.webhook_timeout_seconds, now_iso=now_iso)

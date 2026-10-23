@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     webhook_allow_private: bool = False  # разрешить loopback/private/link-local (локальное демо)
     webhook_timeout_seconds: float = 10.0
 
+    # --- Чат-вебхук (Slack / Discord / Mattermost incoming webhook) ---
+    chat_webhook_url: str | None = None
+    chat_webhook_format: str = Field(default="auto", pattern="^(auto|slack|discord|mattermost)$")
+
     # --- Сид ---
     seed_on_start: bool = True
     seed_user_password: str = Field(default="user12345", min_length=6)
@@ -77,6 +81,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "telegram_bot_token", "telegram_chat_id", "app_fake_today", "smtp_host", "smtp_user", "smtp_password",
+        "chat_webhook_url",
         mode="before",
     )
     @classmethod

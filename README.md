@@ -167,6 +167,34 @@ hmac.compare_digest(expected, signature)
 Адреса loopback/private/link-local (в т. ч. `169.254.169.254`) запрещены — проверка при сохранении и перед
 каждой отправкой. Для локального демо: `WEBHOOK_ALLOW_PRIVATE=true`.
 
+### Slack / Discord / Mattermost
+
+Напоминания можно дублировать в рабочий чат через incoming webhook — достаточно `.env`:
+
+```env
+CHAT_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/XXXX   # или https://discord.com/api/webhooks/…
+CHAT_WEBHOOK_FORMAT=auto                                            # auto | slack | discord | mattermost
+```
+
+Формат определяется по хосту (Discord — `content` с `**жирным**`, Slack/Mattermost — `text` с `*жирным*`).
+В БД вместо URL (в нём секретный токен) хранится только его отпечаток.
+
+### Как добавить свой канал уведомлений
+
+Ядро рассылки (очередь, дедупликация, ретраи, отмена при оплате) от канала не зависит. Новый канал — это:
+
+1. Класс в `backend/app/infrastructure/channels/` с интерфейсом `NotificationChannel`:
+   ```python
+   class SmsChannel:
+       name = "sms"                                   # попадёт в notification_deliveries.channel
+       def recipients(self) -> list[str]: ...         # кому слать (телефоны, chat_id, id адресов)
+       async def send(self, message: Notification, recipient: str) -> SendResult: ...
+   ```
+   `Notification` содержит название, сумму (`Decimal`), валюту, дату, `days_until_due`, `kind`;
+   `SendResult(ok, error, external_id, retryable)`. Исключения из `send` ловятся диспетчером.
+2. Регистрация в `build_channels()` (`channels/registry.py`) по настройке из `.env`.
+3. Тест с `httpx.MockTransport` или фейком по образцу `tests/worker/test_chat_webhook.py`.
+
 ## Сценарий демонстрации
 
 Проходит вживую на чистой установке:
@@ -311,6 +339,7 @@ curl -s localhost:8000/api/v1/payments/summary -H "Authorization: Bearer $TOKEN"
                     │  • постановка напоминаний    │
                     │  • доставка + ретраи         │───► SMTP (Mailpit в демо)
                     │                              │───► Webhook (HMAC)
+                    │                              │───► Slack/Discord/Mattermost
                     │  • long polling Telegram     │◄── нажатия «Оплачено»
                     └──────────────────────────────┘
 ```
@@ -449,6 +478,8 @@ worker_heartbeat, app_meta
 - [x] **Webhook**: CRUD адресов (admin), 4 события, JSON со `schema_version`, подпись HMAC-SHA256, ключ
   идемпотентности, таймауты, ретраи с backoff, журнал доставок, тестовая отправка, SSRF-защита
   (только http/https, запрет внутренних адресов, переключается `WEBHOOK_ALLOW_PRIVATE`), секрет зашифрован (Fernet)
+- [x] **Другие каналы**: Slack/Discord/Mattermost incoming webhook (`CHAT_WEBHOOK_URL`), подключается без
+  изменений в ядре; Telegram, email и webhook используют тот же `NotificationChannel`; инструкция «как добавить свой канал»
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения
