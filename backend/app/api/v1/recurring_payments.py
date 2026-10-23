@@ -8,6 +8,7 @@ from app.api.deps import AdminDep, ContainerDep, DbDep, UserDep
 from app.api.errors import responses
 from app.schemas.payments import RecurringPaymentCreate, RecurringPaymentOut
 from app.services.payments import PaymentService
+from app.services.reminders import dispatch_now
 
 router = APIRouter(prefix="/recurring-payments", tags=["recurring-payments"])
 
@@ -37,11 +38,9 @@ def list_payments(
 def create_payment(
     body: RecurringPaymentCreate, admin: AdminDep, c: ContainerDep, db: DbDep, background: BackgroundTasks
 ) -> RecurringPaymentOut:
-    svc = PaymentService(db, c.clock, c.settings)
+    svc = PaymentService(db, c.clock, c.settings, c.channels)
     payment = svc.create(**body.model_dump(), actor=admin)
-    kick = c.extras.get("kick_dispatch")
-    if kick:
-        background.add_task(kick)
+    background.add_task(dispatch_now, c)
     return RecurringPaymentOut.build(payment, svc.next_due_dates([payment.id])[payment.id])
 
 

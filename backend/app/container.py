@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import Settings, get_settings
 from app.db import get_session_factory
 from app.domain.clock import Clock, SystemClock
+from app.infrastructure.channels.base import ChannelRegistry
+from app.infrastructure.channels.registry import build_channels
 from app.infrastructure.rate_limit import LoginRateLimiter
 
 
@@ -21,6 +23,7 @@ class Container:
     clock: Clock
     session_factory: sessionmaker[Session]
     rate_limiter: LoginRateLimiter
+    channels: ChannelRegistry = field(default_factory=ChannelRegistry)
     extras: dict = field(default_factory=dict)
 
 
@@ -31,4 +34,5 @@ def build_container(settings: Settings | None = None) -> Container:
         clock=SystemClock(settings.tz, settings.app_fake_today),
         session_factory=get_session_factory(),
         rate_limiter=LoginRateLimiter(settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds),
+        channels=build_channels(settings),
     )

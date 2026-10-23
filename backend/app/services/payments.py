@@ -13,15 +13,20 @@ from app.domain.clock import Clock
 from app.domain.errors import NotFound, ValidationError
 from app.domain.money import Currency
 from app.domain.schedule import Recurrence
+from app.infrastructure.channels.base import ChannelRegistry
 from app.models import RecurringPayment, User
 from app.repositories.deliveries import DeliveryRepository
 from app.repositories.payments import OccurrenceRepository, PaymentRepository
 from app.services.occurrences import OccurrenceGenerator
+from app.services.reminders import ReminderService
 
 
 class PaymentService:
-    def __init__(self, db: DbSession, clock: Clock, settings: Settings) -> None:
+    def __init__(
+        self, db: DbSession, clock: Clock, settings: Settings, channels: ChannelRegistry | None = None
+    ) -> None:
         self.db = db
+        self.channels = channels
         self.clock = clock
         self.settings = settings
         self.payments = PaymentRepository(db)
@@ -70,7 +75,9 @@ class PaymentService:
         return payment
 
     def _after_create(self, payment: RecurringPayment) -> None:
-        """Точка расширения: постановка напоминаний (этап 4)."""
+        """Платёж добавлен позже чем за N дней до срока -> напоминание ставится в очередь сразу."""
+        if self.channels is not None:
+            ReminderService(self.db, self.clock, self.settings, self.channels).scan(payment.id, commit=False)
 
     def delete(self, payment_id: uuid.UUID) -> RecurringPayment:
         """Прекращение: новые периоды не создаются, напоминаний больше нет, история сохраняется.

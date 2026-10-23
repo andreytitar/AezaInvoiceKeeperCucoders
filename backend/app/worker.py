@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+import time
 
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
@@ -16,6 +17,8 @@ from sqlalchemy.dialects.postgresql import insert
 from app.container import Container, build_container
 from app.infrastructure.logging import setup_logging
 from app.models import WorkerHeartbeat
+from app.services.occurrences import OccurrenceGenerator
+from app.services.reminders import ReminderService, make_dispatcher
 
 log = logging.getLogger("app.worker")
 
@@ -36,7 +39,12 @@ class Worker:
         self._heartbeat(ok)
 
     async def _run_jobs(self) -> None:
-        pass
+        c = self.c
+        with c.session_factory() as db:
+            OccurrenceGenerator(db, c.clock).ensure_all()
+        with c.session_factory() as db:
+            ReminderService(db, c.clock, c.settings, c.channels).scan()
+        await make_dispatcher(c).run()
 
     def _heartbeat(self, ok: bool) -> None:
         now = self.c.clock.now()
@@ -46,8 +54,6 @@ class Worker:
             s.commit()
 
     def wait_for_schema(self, timeout: float = 120) -> None:
-        import time
-
         deadline = time.monotonic() + timeout
         while True:
             try:

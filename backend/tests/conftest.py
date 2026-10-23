@@ -17,7 +17,9 @@ from sqlalchemy.orm import sessionmaker
 from app.config import Settings
 from app.container import Container
 from app.domain.clock import FixedClock
+from app.infrastructure.channels.base import ChannelRegistry
 from app.infrastructure.rate_limit import LoginRateLimiter
+from tests.fakes import FakeChannel
 
 BACKEND = Path(__file__).resolve().parents[1]
 TEST_DATABASE_URL = os.environ.get(
@@ -86,12 +88,18 @@ def settings():
 
 
 @pytest.fixture
-def container(engine, clean_db, clock, settings):
+def fake_channel():
+    return FakeChannel()
+
+
+@pytest.fixture
+def container(engine, clean_db, clock, settings, fake_channel):
     return Container(
         settings=settings,
         clock=clock,
         session_factory=sessionmaker(bind=engine, expire_on_commit=False, autoflush=False),
         rate_limiter=LoginRateLimiter(settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds),
+        channels=ChannelRegistry([fake_channel]),
     )
 
 
