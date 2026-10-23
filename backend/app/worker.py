@@ -20,6 +20,7 @@ from app.models import WorkerHeartbeat
 from app.infrastructure.channels.telegram import TelegramClient
 from app.services.occurrences import OccurrenceGenerator
 from app.services.telegram_updates import TelegramUpdateHandler
+from app.services.webhooks import WebhookEvents
 from app.services.reminders import ReminderService, make_dispatcher
 
 log = logging.getLogger("app.worker")
@@ -46,6 +47,8 @@ class Worker:
             OccurrenceGenerator(db, c.clock).ensure_all()
         with c.session_factory() as db:
             ReminderService(db, c.clock, c.settings, c.channels).scan()
+        with c.session_factory() as db:
+            WebhookEvents(db, c.clock).scan_overdue()
         await make_dispatcher(c).run()
 
     def _heartbeat(self, ok: bool) -> None:

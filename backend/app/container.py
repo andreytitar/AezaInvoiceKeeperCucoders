@@ -37,10 +37,15 @@ def build_container(settings: Settings | None = None) -> Container:
         with session_factory() as db:
             return UserRepository(db).active_emails()
 
+    from app.services.webhooks import endpoint_configs
+
+    clock = SystemClock(settings.tz, settings.app_fake_today)
     return Container(
         settings=settings,
-        clock=SystemClock(settings.tz, settings.app_fake_today),
+        clock=clock,
         session_factory=session_factory,
         rate_limiter=LoginRateLimiter(settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds),
-        channels=build_channels(settings, user_emails),
+        channels=build_channels(
+            settings, user_emails, endpoint_configs(session_factory, settings), lambda: clock.now().isoformat()
+        ),
     )

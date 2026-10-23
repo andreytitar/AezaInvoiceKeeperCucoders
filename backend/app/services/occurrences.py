@@ -17,6 +17,7 @@ from app.models import PaymentOccurrence, RecurringPayment, User
 from app.repositories.deliveries import DeliveryRepository
 from app.repositories.payments import OccurrenceFilter, OccurrenceRepository, PaymentRepository
 from app.services.audit import AuditService, occurrence_snapshot
+from app.services.webhooks import WebhookEvents
 
 
 class OccurrenceGenerator:
@@ -114,6 +115,8 @@ class OccurrenceService:
                 action, entity_type="payment_occurrence", entity_id=occ.id, before=before,
                 after=occurrence_snapshot(occ), actor=actor, actor_login=actor_login,
             )
+            if was_paid != mark.is_paid:
+                WebhookEvents(self.db, self.clock).emit(occ, "payment.paid" if mark.is_paid else "payment.unpaid")
         if mark.is_paid:
             self.deliveries.cancel_open_for_occurrence(occ.id)
         elif occ.payment.deleted_at is None:

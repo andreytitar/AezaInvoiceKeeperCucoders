@@ -14,7 +14,9 @@ class DeliveryRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def cancel_open_for_occurrence(self, occurrence_id: uuid.UUID, kinds: tuple[str, ...] = ("reminder",)) -> int:
+    def cancel_open_for_occurrence(
+        self, occurrence_id: uuid.UUID, kinds: tuple[str, ...] = ("reminder", "payment.overdue")
+    ) -> int:
         """Ещё не отправленные доставки периода -> cancelled (отметили оплату / удалили платёж)."""
         res = self.db.execute(
             update(NotificationDelivery)
@@ -33,6 +35,7 @@ class DeliveryRepository:
             update(NotificationDelivery)
             .where(
                 NotificationDelivery.occurrence_id.in_(occ_ids),
+                NotificationDelivery.kind.in_(("reminder", "payment.overdue")),
                 NotificationDelivery.status.in_((DeliveryStatus.PENDING, DeliveryStatus.FAILED)),
             )
             .values(status=DeliveryStatus.CANCELLED, last_error="cancelled: payment deleted")

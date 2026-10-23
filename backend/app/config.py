@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     email_recipients: str = ""  # общий список через запятую
     email_to_users: bool = True  # плюс email из профилей пользователей
 
+    # --- Webhook ---
+    webhook_allow_private: bool = False  # разрешить loopback/private/link-local (локальное демо)
+    webhook_timeout_seconds: float = 10.0
+
     # --- Сид ---
     seed_on_start: bool = True
     seed_user_password: str = Field(default="user12345", min_length=6)

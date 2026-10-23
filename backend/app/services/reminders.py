@@ -98,22 +98,30 @@ class DeliveryDispatcher:
         self.builders = notification_builders or {}
         self.on_sent = on_sent  # хук для аудита и т. п. (этап 8)
 
-    def build_reminder(self, occ: PaymentOccurrence) -> Notification:
+    def build_notification(self, d: NotificationDelivery, occ: PaymentOccurrence) -> Notification:
+        is_reminder = d.kind == DeliveryKind.REMINDER.value
         return Notification(
             occurrence_id=occ.id,
             title=occ.title_snapshot,
             amount=occ.amount_snapshot,
             currency=occ.currency_snapshot.value,
             due_date=occ.due_date,
-            kind=DeliveryKind.REMINDER.value,
+            kind=d.kind,
             days_until_due=days_until(occ.due_date, self.clock.today()),
-            actions=(Action("Оплачено", f"paid:{occ.id}"),),
+            actions=(Action("Оплачено", f"paid:{occ.id}"),) if is_reminder else (),
+            extra={
+                "delivery_id": str(d.id),
+                "status": "paid" if occ.is_paid else "unpaid",
+                "paid_date": occ.paid_date.isoformat() if occ.paid_date else None,
+                "recurring_payment_id": str(occ.recurring_payment_id),
+            },
         )
 
     def _still_relevant(self, d: NotificationDelivery, occ: PaymentOccurrence | None) -> bool:
         if occ is None:
             return False
-        if d.kind == DeliveryKind.REMINDER.value:
+        if d.kind in (DeliveryKind.REMINDER.value, "payment.overdue"):
+            # напоминание и «просрочено» неактуальны, если период оплачен или платёж удалён
             return not occ.is_paid and occ.payment.deleted_at is None
         return True
 
@@ -164,7 +172,7 @@ class DeliveryDispatcher:
                 log.error("Канал %s не настроен, доставка %s -> dead", d.channel, d.id)
                 return
             builder = self.builders.get(d.kind, None)
-            message = builder(db, d, occ) if builder else self.build_reminder(occ)
+            message = builder(db, d, occ) if builder else self.build_notification(d, occ)
             recipient = d.recipient
 
         # 2. Отправка (вне транзакции)

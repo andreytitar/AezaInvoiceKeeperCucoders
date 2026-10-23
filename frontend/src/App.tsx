@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { RecurringPaymentsPage } from './pages/RecurringPaymentsPage'
 import { UsersPage } from './pages/UsersPage'
+import { WebhooksPage } from './pages/WebhooksPage'
 import { AuthProvider, useAuth } from './store/auth'
 import { ToastProvider } from './store/toast'
 
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="recurring" element={<Protected admin><RecurringPaymentsPage /></Protected>} />
               <Route path="users" element={<Protected admin><UsersPage /></Protected>} />
               <Route path="audit" element={<Protected admin><AuditPage /></Protected>} />
+              <Route path="webhooks" element={<Protected admin><WebhooksPage /></Protected>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

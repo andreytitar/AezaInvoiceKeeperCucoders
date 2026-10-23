@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, Query
 
 from app.api.deps import ContainerDep, DbDep, UserDep
 from app.api.errors import responses
@@ -12,6 +12,7 @@ from app.domain.status import PaymentStatus
 from app.repositories.payments import OccurrenceFilter
 from app.schemas.payments import OccurrenceOut, OccurrencePage, OccurrencePatch, OccurrenceSort
 from app.services.occurrences import OccurrenceService
+from app.services.reminders import dispatch_now
 
 router = APIRouter(prefix="/payment-occurrences", tags=["payment-occurrences"])
 
@@ -65,7 +66,12 @@ def get_occurrence(occurrence_id: uuid.UUID, _: UserDep, c: ContainerDep, db: Db
     responses=responses(401, 404, 422),
 )
 def patch_occurrence(
-    occurrence_id: uuid.UUID, body: OccurrencePatch, user: UserDep, c: ContainerDep, db: DbDep
+    occurrence_id: uuid.UUID,
+    body: OccurrencePatch,
+    user: UserDep,
+    c: ContainerDep,
+    db: DbDep,
+    background: BackgroundTasks,
 ) -> OccurrenceOut:
     occ = OccurrenceService(db, c.clock, c.settings).mark(
         occurrence_id,
@@ -74,4 +80,5 @@ def patch_occurrence(
         paid_date_provided="paid_date" in body.model_fields_set,
         actor=user,
     )
+    background.add_task(dispatch_now, c)  # события payment.paid/unpaid для вебхуков
     return OccurrenceOut.build(occ, c.clock.today())

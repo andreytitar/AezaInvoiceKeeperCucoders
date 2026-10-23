@@ -26,7 +26,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.domain.money import Currency
@@ -279,3 +279,16 @@ class Budget(TimestampMixin, Base):
     month: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     currency: Mapped[Currency] = mapped_column(_enum(Currency, "currency"))
     planned_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+
+
+class WebhookEndpoint(TimestampMixin, Base):
+    """Адрес для вебхуков. Доставки идут через notification_deliveries (channel='webhook', recipient=id)."""
+
+    __tablename__ = "webhook_endpoints"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    url: Mapped[str] = mapped_column(String(2000))
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    events: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))

@@ -137,6 +137,36 @@ open http://localhost:8025                   # входящие письма
 
 Для настоящего SMTP задайте `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURITY=starttls|ssl`.
 
+### Вебхуки
+
+Администратор добавляет адреса в разделе «Вебхуки» (или `POST /api/v1/webhooks`) и выбирает события:
+`payment.reminder`, `payment.paid`, `payment.unpaid`, `payment.overdue`. Пример тела:
+
+```json
+{
+  "schema_version": "1",
+  "event": "payment.paid",
+  "event_id": "5b0c…",
+  "occurred_at": "2026-10-24T09:12:00+00:00",
+  "data": {"occurrence_id": "…", "recurring_payment_id": "…", "title": "Аренда офиса", "amount": "55000.00",
+           "currency": "RUB", "due_date": "2026-11-05", "status": "paid", "paid_date": "2026-10-24", "days_until_due": 12}
+}
+```
+
+Заголовки: `X-InvoiceKeeper-Event`, `Idempotency-Key` (= `event_id`, одинаковый при повторах одной доставки),
+`X-InvoiceKeeper-Timestamp`, `X-InvoiceKeeper-Signature: sha256=<hex>` — HMAC-SHA256 от `timestamp + "." + body`
+секретом вебхука (секрет хранится зашифрованным и не возвращается в API). Проверка на стороне получателя:
+
+```python
+expected = "sha256=" + hmac.new(secret, f"{ts}.".encode() + body, hashlib.sha256).hexdigest()
+hmac.compare_digest(expected, signature)
+```
+
+Таймаут 10 с, без редиректов, повторы 1/5/15/60 мин, потом `dead`; журнал доставок — кнопка «Журнал».
+`payment.overdue` приходит один раз на период, `payment.paid/unpaid` — на каждое изменение статуса.
+Адреса loopback/private/link-local (в т. ч. `169.254.169.254`) запрещены — проверка при сохранении и перед
+каждой отправкой. Для локального демо: `WEBHOOK_ALLOW_PRIVATE=true`.
+
 ## Сценарий демонстрации
 
 Проходит вживую на чистой установке:
@@ -225,6 +255,7 @@ Telegram — `FakeChannel` и `httpx.MockTransport`.
 | `GET /payments/calendar`, `GET /payments/summary?as_of=` | 401 | ✔ | ✔ |
 | `GET /budgets`, `GET /budgets/report` | 401 | ✔ | ✔ |
 | `PUT /budgets`, `DELETE /budgets/{id}` | 401 | 403 | ✔ |
+| `GET/POST /webhooks`, `PATCH/DELETE /webhooks/{id}`, `GET /webhooks/{id}/deliveries`, `POST /webhooks/{id}/test` | 401 | 403 | ✔ |
 | `GET /audit-logs` | 401 | 403 | ✔ |
 | `GET /health`, `/docs`, `/openapi.json` | ✔ | ✔ | ✔ |
 
@@ -279,6 +310,7 @@ curl -s localhost:8000/api/v1/payments/summary -H "Authorization: Bearer $TOKEN"
                     │  • генерация периодов        │───► Telegram Bot API
                     │  • постановка напоминаний    │
                     │  • доставка + ретраи         │───► SMTP (Mailpit в демо)
+                    │                              │───► Webhook (HMAC)
                     │  • long polling Telegram     │◄── нажатия «Оплачено»
                     └──────────────────────────────┘
 ```
@@ -315,6 +347,7 @@ payment_occurrences   снимок title/amount/currency, due_date DATE, is_paid
 notification_deliveries  occurrence_id, channel, recipient, kind, status, attempts, next_attempt_at, last_error, sent_at, locked_at
                       UNIQUE(occurrence_id, channel, recipient, kind)
 audit_logs            at, seq, actor_user_id, actor_login, action, entity_type, entity_id, before/after JSONB, ip, user_agent
+webhook_endpoints     url, events[], secret_enc (Fernet от SECRET_KEY), is_active; доставки — в notification_deliveries (channel='webhook')
 budgets               period_type month|year, year, month, currency, planned_amount; UNIQUE(тип, год, месяц, валюта)
 receipts              occurrence_id UNIQUE, url, file_path (случайное имя), file_name, mime, size, uploaded_by
 telegram_updates_offset  last_update_id (long polling)
@@ -371,7 +404,8 @@ worker_heartbeat, app_meta
 | Ограничение попыток входа | 5 неудачных за 5 минут на пару IP+логин, в памяти процесса api (одного экземпляра достаточно; для нескольких — вынести в Redis/БД) |
 | CSRF | cookie `SameSite=Lax` + для изменяющих запросов по cookie сверка `Origin`/`Referer` с хостом. Запросы с `Authorization: Bearer` CSRF не подвержены |
 | Доставка «ровно один раз» | гарантия «не больше одного успешного `sent` на период/канал/получателя». Если worker упадёт между ответом Telegram и записью `sent`, после таймаута возможен один повтор — при внешнем API без идемпотентных ключей это неизбежно |
-| `kind` доставки | `TEXT`, а не ENUM: новые виды уведомлений добавляются без миграции типа |
+| `kind` доставки | `TEXT`, а не ENUM: новые виды уведомлений добавляются без миграции типа. Для `payment.paid/unpaid` в `kind` добавляется id события (`payment.paid:<id>`), чтобы каждое изменение статуса было отдельной доставкой, а повторы одной — нет |
+| SSRF вебхуков | адрес проверяется при сохранении и перед отправкой (DNS → IP). Между проверкой и соединением остаётся окно DNS rebinding; для продакшена — исходящий прокси с allowlist |
 | Итоги на дату | «оплачено» — `paid_date ≤ as_of`; «просрочено» — срок < `as_of` и к этой дате не оплачено; «предстоит» — срок ≥ `as_of`. Учитываются материализованные периоды (история + ближайший и следующий), прогноз дальше не строится |
 | Бюджет | «запланировано» — сумма периодов со сроком в периоде бюджета (по материализованным периодам: для будущих месяцев года виден ближайший и следующий период, прогноз дальше не строится). Остаток = бюджет − запланировано |
 | Чек | один на период: ссылка и/или файл; новая часть заменяет прежнюю, прежний файл удаляется. Файл отдаётся с `nosniff` и `Content-Security-Policy: sandbox` |
@@ -412,6 +446,9 @@ worker_heartbeat, app_meta
   остаток, превышение по каждой валюте. В панели — шкалы прогресса и предупреждение о превышении
 - [x] **Email через SMTP**: канал `email` (`NotificationChannel`), письмо text + HTML, общий список и email
   пользователей, тот же UNIQUE/ретраи/без дублей; Mailpit в профиле `demo-mail`; тесты с мок-SMTP
+- [x] **Webhook**: CRUD адресов (admin), 4 события, JSON со `schema_version`, подпись HMAC-SHA256, ключ
+  идемпотентности, таймауты, ретраи с backoff, журнал доставок, тестовая отправка, SSRF-защита
+  (только http/https, запрет внутренних адресов, переключается `WEBHOOK_ALLOW_PRIVATE`), секрет зашифрован (Fernet)
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения

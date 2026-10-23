@@ -23,6 +23,7 @@ export function Layout() {
       ? [
           { to: '/recurring', label: 'Регулярные платежи', end: false },
           { to: '/users', label: 'Пользователи', end: false },
+          { to: '/webhooks', label: 'Вебхуки', end: false },
           { to: '/audit', label: 'Журнал', end: false },
         ]
       : []),
