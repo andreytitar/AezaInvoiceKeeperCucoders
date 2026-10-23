@@ -244,6 +244,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payment-occurrences/{occurrence_id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Чек периода */
+        get: operations["get_receipt_api_v1_payment_occurrences__occurrence_id__receipt_get"];
+        /**
+         * Прикрепить/заменить чек: ссылка и/или файл
+         * @description multipart/form-data: `url` (http/https) и/или `file` (PNG, JPG, PDF до 5 МБ; тип проверяется по содержимому). Переданная часть заменяет прежнюю, непереданная сохраняется.
+         */
+        put: operations["put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put"];
+        post?: never;
+        /** Удалить чек */
+        delete: operations["delete_receipt_api_v1_payment_occurrences__occurrence_id__receipt_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-occurrences/{occurrence_id}/receipt/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Скачать файл чека (только авторизованным) */
+        get: operations["download_receipt_api_v1_payment_occurrences__occurrence_id__receipt_file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -293,6 +332,13 @@ export interface components {
             page: number;
             /** Page Size */
             page_size: number;
+        };
+        /** Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put */
+        Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put: {
+            /** Url */
+            url?: string | null;
+            /** File */
+            file?: string | null;
         };
         /** Body_token_api_v1_auth_token_post */
         Body_token_api_v1_auth_token_post: {
@@ -463,6 +509,12 @@ export interface components {
              * @description Платёж прекращён (история сохранена)
              */
             recurring_payment_deleted: boolean;
+            /**
+             * Has Receipt
+             * @description К периоду прикреплён чек или ссылка
+             * @default false
+             */
+            has_receipt: boolean;
         };
         /** OccurrencePage */
         OccurrencePage: {
@@ -492,6 +544,29 @@ export interface components {
          * @enum {string}
          */
         PaymentStatus: "paid" | "unpaid";
+        /** ReceiptOut */
+        ReceiptOut: {
+            /**
+             * Occurrence Id
+             * Format: uuid
+             */
+            occurrence_id: string;
+            /** Url */
+            url: string | null;
+            /** File Name */
+            file_name: string | null;
+            /** Mime */
+            mime: string | null;
+            /** Size */
+            size: number | null;
+            /** File Url */
+            file_url: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * Recurrence
          * @enum {string}
@@ -1465,6 +1540,213 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_receipt_api_v1_payment_occurrences__occurrence_id__receipt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                occurrence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                occurrence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Файл больше 5 МБ */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_receipt_api_v1_payment_occurrences__occurrence_id__receipt_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                occurrence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_receipt_api_v1_payment_occurrences__occurrence_id__receipt_file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                occurrence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                    "image/png": unknown;
+                    "image/jpeg": unknown;
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

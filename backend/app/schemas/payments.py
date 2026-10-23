@@ -76,6 +76,7 @@ class OccurrenceOut(OutputModel):
     overdue_days: int
     days_until_due: int = Field(description="Дней до срока (отрицательное — срок прошёл)")
     recurring_payment_deleted: bool = Field(description="Платёж прекращён (история сохранена)")
+    has_receipt: bool = Field(default=False, description="К периоду прикреплён чек или ссылка")
 
 
     @classmethod
@@ -94,6 +95,7 @@ class OccurrenceOut(OutputModel):
             overdue_days=info.overdue_days,
             days_until_due=days_until(o.due_date, today),
             recurring_payment_deleted=o.payment.deleted_at is not None,
+            has_receipt=o.receipt is not None,
         )
 
 

@@ -71,7 +71,7 @@ def clock():
 
 
 @pytest.fixture
-def settings():
+def settings(tmp_path):
     return Settings(
         _env_file=None,
         database_url=TEST_DATABASE_URL,
@@ -83,6 +83,7 @@ def settings():
         telegram_chat_id="-100500",
         seed_user_password="user-pass-123",
         seed_on_start=False,
+        uploads_dir=str(tmp_path / "uploads"),
         log_level="WARNING",
         session_ttl_hours=24 * 365 * 3,  # тесты двигают часы на месяцы вперёд
     )

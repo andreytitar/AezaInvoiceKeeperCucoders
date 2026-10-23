@@ -807,6 +807,173 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/payment-occurrences/{occurrence_id}/receipt:
+    get:
+      tags:
+      - receipts
+      summary: Чек периода
+      operationId: get_receipt_api_v1_payment_occurrences__occurrence_id__receipt_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Occurrence Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - receipts
+      summary: 'Прикрепить/заменить чек: ссылка и/или файл'
+      description: 'multipart/form-data: `url` (http/https) и/или `file` (PNG, JPG, PDF до 5 МБ; тип проверяется по содержимому).
+        Переданная часть заменяет прежнюю, непереданная сохраняется.'
+      operationId: put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Occurrence Id
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Файл больше 5 МБ
+    delete:
+      tags:
+      - receipts
+      summary: Удалить чек
+      operationId: delete_receipt_api_v1_payment_occurrences__occurrence_id__receipt_delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Occurrence Id
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/payment-occurrences/{occurrence_id}/receipt/file:
+    get:
+      tags:
+      - receipts
+      summary: Скачать файл чека (только авторизованным)
+      operationId: download_receipt_api_v1_payment_occurrences__occurrence_id__receipt_file_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Occurrence Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/pdf: {}
+            image/png: {}
+            image/jpeg: {}
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     AuditLogOut:
@@ -902,6 +1069,22 @@ components:
       - page
       - page_size
       title: AuditLogPage
+    Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put:
+      properties:
+        url:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Url
+        file:
+          anyOf:
+          - type: string
+            contentMediaType: application/octet-stream
+          - type: 'null'
+          title: File
+      type: object
+      title: Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put
     Body_token_api_v1_auth_token_post:
       properties:
         grant_type:
@@ -1162,6 +1345,11 @@ components:
           type: boolean
           title: Recurring Payment Deleted
           description: Платёж прекращён (история сохранена)
+        has_receipt:
+          type: boolean
+          title: Has Receipt
+          description: К периоду прикреплён чек или ссылка
+          default: false
       type: object
       required:
       - id
@@ -1223,6 +1411,51 @@ components:
       - paid
       - unpaid
       title: PaymentStatus
+    ReceiptOut:
+      properties:
+        occurrence_id:
+          type: string
+          format: uuid
+          title: Occurrence Id
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        file_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Name
+        mime:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mime
+        size:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Size
+        file_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Url
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - occurrence_id
+      - url
+      - file_name
+      - mime
+      - size
+      - file_url
+      - updated_at
+      title: ReceiptOut
     Recurrence:
       type: string
       enum:

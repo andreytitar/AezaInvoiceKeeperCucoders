@@ -150,6 +150,7 @@ class PaymentOccurrence(TimestampMixin, Base):
     )
 
     payment: Mapped[RecurringPayment] = relationship(lazy="joined")
+    receipt: Mapped["Receipt | None"] = relationship(lazy="selectin", uselist=False, viewonly=True)
 
 
 class NotificationDelivery(Base):
@@ -230,3 +231,24 @@ class TelegramUpdatesOffset(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     last_update_id: Mapped[int] = mapped_column(BigInteger)
+
+
+class Receipt(Base):
+    """Чек к конкретному периоду: ссылка и/или файл (png/jpg/pdf). Один чек на период."""
+
+    __tablename__ = "receipts"
+    __table_args__ = (
+        UniqueConstraint("occurrence_id", name="uq_receipt_occurrence"),
+        CheckConstraint("url IS NOT NULL OR file_path IS NOT NULL", name="ck_receipt_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    occurrence_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payment_occurrences.id", ondelete="CASCADE"))
+    url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

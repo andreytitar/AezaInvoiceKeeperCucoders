@@ -202,6 +202,7 @@ Telegram — `FakeChannel` и `httpx.MockTransport`.
 | `PATCH /payment-occurrences/{id}` (только `status`, `paid_date`) | 401 | ✔ | ✔ |
 | `GET /payments/summary` | 401 | ✔ | ✔ |
 | `GET/POST/PATCH/DELETE /users` | 401 | 403 | ✔ (системный админ: 403) |
+| `GET/PUT/DELETE /payment-occurrences/{id}/receipt`, `GET …/receipt/file` | 401 | ✔ | ✔ |
 | `GET /audit-logs` | 401 | 403 | ✔ |
 | `GET /health`, `/docs`, `/openapi.json` | ✔ | ✔ | ✔ |
 
@@ -292,6 +293,7 @@ payment_occurrences   снимок title/amount/currency, due_date DATE, is_paid
 notification_deliveries  occurrence_id, channel, recipient, kind, status, attempts, next_attempt_at, last_error, sent_at, locked_at
                       UNIQUE(occurrence_id, channel, recipient, kind)
 audit_logs            at, seq, actor_user_id, actor_login, action, entity_type, entity_id, before/after JSONB, ip, user_agent
+receipts              occurrence_id UNIQUE, url, file_path (случайное имя), file_name, mime, size, uploaded_by
 telegram_updates_offset  last_update_id (long polling)
 worker_heartbeat, app_meta
 ```
@@ -347,6 +349,7 @@ worker_heartbeat, app_meta
 | CSRF | cookie `SameSite=Lax` + для изменяющих запросов по cookie сверка `Origin`/`Referer` с хостом. Запросы с `Authorization: Bearer` CSRF не подвержены |
 | Доставка «ровно один раз» | гарантия «не больше одного успешного `sent` на период/канал/получателя». Если worker упадёт между ответом Telegram и записью `sent`, после таймаута возможен один повтор — при внешнем API без идемпотентных ключей это неизбежно |
 | `kind` доставки | `TEXT`, а не ENUM: новые виды уведомлений добавляются без миграции типа |
+| Чек | один на период: ссылка и/или файл; новая часть заменяет прежнюю, прежний файл удаляется. Файл отдаётся с `nosniff` и `Content-Security-Policy: sandbox` |
 | Шрифты панели | встроены в сборку (`@fontsource`), панель работает без интернета |
 
 ## Реализованные возможности
@@ -371,6 +374,10 @@ worker_heartbeat, app_meta
   слоя в той же транзакции, что и изменение. Логи приложения — JSON с `request_id`, секреты маскируются
 - [x] **Кнопка «Оплачено» в Telegram**: inline-кнопка, привязка `telegram_user_id`, отказ непривязанным,
   идемпотентность, редактирование сообщения «кто и когда», long polling в worker
+- [x] **Чек или ссылка к оплате**: `PUT/GET/DELETE /api/v1/payment-occurrences/{id}/receipt` (multipart: `url`
+  и/или `file`), скачивание `…/receipt/file` только авторизованным. Ссылки только http/https; файлы PNG/JPG/PDF
+  до 5 МБ, тип определяется по магическим байтам, имя случайное, хранение в volume `uploads`. Права как у
+  отметки оплаты, действия в журнале. В панели — кнопка «Чек» и пометка у периода
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения

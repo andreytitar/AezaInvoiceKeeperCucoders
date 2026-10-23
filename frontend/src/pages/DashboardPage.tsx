@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, unwrap, type Occurrence } from '../api/client'
 import { MarkPaidDialog } from '../components/MarkPaidDialog'
+import { ReceiptDialog } from '../components/ReceiptDialog'
 import { OverdueCell, StatusCell } from '../components/Status'
 import { SummaryCards } from '../components/SummaryCards'
 import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../components/ui'
@@ -48,6 +49,7 @@ export function DashboardPage() {
   const [page, setPage] = useState(1)
   const [paying, setPaying] = useState<Occurrence | null>(null)
   const [unpaying, setUnpaying] = useState<Occurrence | null>(null)
+  const [receiptFor, setReceiptFor] = useState<Occurrence | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -272,6 +274,11 @@ export function DashboardPage() {
                 <tr key={o.id}>
                   <td>
                     <span className="font-semibold">{o.title}</span>
+                    {o.has_receipt && (
+                      <button className="ml-2 num text-[0.65rem] uppercase tracking-wider border border-ink-soft text-ink-soft px-1 rounded-sm align-middle" onClick={() => setReceiptFor(o)} title="Открыть чек">
+                        чек
+                      </button>
+                    )}
                     {o.recurring_payment_deleted && (
                       <span className="block text-xs text-ink-soft" title="Регулярный платёж прекращён, история сохранена">
                         платёж прекращён
@@ -289,6 +296,9 @@ export function DashboardPage() {
                     <OverdueCell o={o} />
                   </td>
                   <td className="text-right whitespace-nowrap">
+                    <button className="btn btn-sm btn-ghost mr-1" onClick={() => setReceiptFor(o)} aria-label={`Чек для «${o.title}»`}>
+                      Чек
+                    </button>
                     {o.status === 'unpaid' ? (
                       <span className="inline-flex gap-1">
                         <button
@@ -347,6 +357,7 @@ export function DashboardPage() {
         onClose={() => setPaying(null)}
         onSubmit={(d) => paying && markPaid(paying, d)}
       />
+      <ReceiptDialog occurrence={receiptFor} onClose={() => setReceiptFor(null)} onChanged={list.reload} />
       <ConfirmDialog
         open={!!unpaying}
         title="Отменить оплату?"

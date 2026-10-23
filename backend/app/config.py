@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     seed_on_start: bool = True
     seed_user_password: str = Field(default="user12345", min_length=6)
 
+    # --- Чеки ---
+    uploads_dir: str = "/app/uploads"
+    receipt_max_bytes: int = 5 * 1024 * 1024
+
     # --- Прочее ---
     log_level: str = "INFO"
     static_dir: str = "/app/static"
