@@ -38,6 +38,11 @@ class Role(StrEnum):
     USER = "user"
 
 
+class BudgetPeriod(StrEnum):
+    MONTH = "month"
+    YEAR = "year"
+
+
 class DeliveryKind(StrEnum):
     REMINDER = "reminder"
 
@@ -252,3 +257,25 @@ class Receipt(Base):
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Budget(TimestampMixin, Base):
+    """Плановая сумма расходов на месяц или год, отдельно по каждой валюте."""
+
+    __tablename__ = "budgets"
+    __table_args__ = (
+        UniqueConstraint("period_type", "year", "month", "currency", name="uq_budget_period_currency",
+                         postgresql_nulls_not_distinct=True),
+        CheckConstraint(
+            "(period_type = 'month' AND month BETWEEN 1 AND 12) OR (period_type = 'year' AND month IS NULL)",
+            name="ck_budget_month",
+        ),
+        CheckConstraint("planned_amount >= 0", name="ck_budget_amount"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    period_type: Mapped[BudgetPeriod] = mapped_column(_enum(BudgetPeriod, "budget_period"))
+    year: Mapped[int] = mapped_column(SmallInteger)
+    month: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    currency: Mapped[Currency] = mapped_column(_enum(Currency, "currency"))
+    planned_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))

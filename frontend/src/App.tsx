@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Loading } from './components/ui'
 import { AuditPage } from './pages/AuditPage'
+import { BudgetPage } from './pages/BudgetPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
@@ -34,6 +35,7 @@ export default function App() {
             >
               <Route index element={<DashboardPage />} />
               <Route path="calendar" element={<CalendarPage />} />
+              <Route path="budget" element={<BudgetPage />} />
               <Route path="recurring" element={<Protected admin><RecurringPaymentsPage /></Protected>} />
               <Route path="users" element={<Protected admin><UsersPage /></Protected>} />
               <Route path="audit" element={<Protected admin><AuditPage /></Protected>} />

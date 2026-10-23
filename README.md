@@ -204,6 +204,8 @@ Telegram — `FakeChannel` и `httpx.MockTransport`.
 | `GET/POST/PATCH/DELETE /users` | 401 | 403 | ✔ (системный админ: 403) |
 | `GET/PUT/DELETE /payment-occurrences/{id}/receipt`, `GET …/receipt/file` | 401 | ✔ | ✔ |
 | `GET /payments/calendar`, `GET /payments/summary?as_of=` | 401 | ✔ | ✔ |
+| `GET /budgets`, `GET /budgets/report` | 401 | ✔ | ✔ |
+| `PUT /budgets`, `DELETE /budgets/{id}` | 401 | 403 | ✔ |
 | `GET /audit-logs` | 401 | 403 | ✔ |
 | `GET /health`, `/docs`, `/openapi.json` | ✔ | ✔ | ✔ |
 
@@ -294,6 +296,7 @@ payment_occurrences   снимок title/amount/currency, due_date DATE, is_paid
 notification_deliveries  occurrence_id, channel, recipient, kind, status, attempts, next_attempt_at, last_error, sent_at, locked_at
                       UNIQUE(occurrence_id, channel, recipient, kind)
 audit_logs            at, seq, actor_user_id, actor_login, action, entity_type, entity_id, before/after JSONB, ip, user_agent
+budgets               period_type month|year, year, month, currency, planned_amount; UNIQUE(тип, год, месяц, валюта)
 receipts              occurrence_id UNIQUE, url, file_path (случайное имя), file_name, mime, size, uploaded_by
 telegram_updates_offset  last_update_id (long polling)
 worker_heartbeat, app_meta
@@ -351,6 +354,7 @@ worker_heartbeat, app_meta
 | Доставка «ровно один раз» | гарантия «не больше одного успешного `sent` на период/канал/получателя». Если worker упадёт между ответом Telegram и записью `sent`, после таймаута возможен один повтор — при внешнем API без идемпотентных ключей это неизбежно |
 | `kind` доставки | `TEXT`, а не ENUM: новые виды уведомлений добавляются без миграции типа |
 | Итоги на дату | «оплачено» — `paid_date ≤ as_of`; «просрочено» — срок < `as_of` и к этой дате не оплачено; «предстоит» — срок ≥ `as_of`. Учитываются материализованные периоды (история + ближайший и следующий), прогноз дальше не строится |
+| Бюджет | «запланировано» — сумма периодов со сроком в периоде бюджета (по материализованным периодам: для будущих месяцев года виден ближайший и следующий период, прогноз дальше не строится). Остаток = бюджет − запланировано |
 | Чек | один на период: ссылка и/или файл; новая часть заменяет прежнюю, прежний файл удаляется. Файл отдаётся с `nosniff` и `Content-Security-Policy: sandbox` |
 | Шрифты панели | встроены в сборку (`@fontsource`), панель работает без интернета |
 
@@ -384,6 +388,9 @@ worker_heartbeat, app_meta
   итоги дня по валютам, до 92 дней) и `GET /api/v1/payments/summary?as_of=YYYY-MM-DD` (оплачено к дате,
   просрочено на дату, предстоит). В панели — месячная сетка с бейджами (цвет + знак ✓/!/○), итоги дня,
   клик по периоду — детали и отметка оплаты, переход по месяцам, выбор даты итогов
+- [x] **Бюджет на месяц и год**: таблица `budgets` (тип, год, месяц, валюта, плановая сумма), `PUT/GET/DELETE
+  /api/v1/budgets` (менять — admin, смотреть — все) и `GET /api/v1/budgets/report` — запланировано, оплачено,
+  остаток, превышение по каждой валюте. В панели — шкалы прогресса и предупреждение о превышении
 - [x] Периодичность: еженедельно, ежеквартально, ежегодно (стратегии `RecurrenceStrategy`, 29 фев → 28 фев в невисокосный год)
 
 ## Переменные окружения

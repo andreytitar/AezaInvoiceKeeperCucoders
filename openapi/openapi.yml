@@ -1030,6 +1030,199 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/budgets:
+    get:
+      tags:
+      - budgets
+      summary: Бюджеты (все пользователи)
+      operationId: list_budgets_api_v1_budgets_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: period_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/BudgetPeriod'
+          - type: 'null'
+          title: Period Type
+      - name: year
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 2100
+            minimum: 2000
+          - type: 'null'
+          title: Year
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 12
+            minimum: 1
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BudgetOut'
+                title: Response List Budgets Api V1 Budgets Get
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+      - budgets
+      summary: Задать или изменить бюджет (admin)
+      description: 'Уникален по (тип, год, месяц, валюта): повторный PUT меняет плановую сумму.'
+      operationId: upsert_budget_api_v1_budgets_put
+      security:
+      - OAuth2PasswordBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetUpsert'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/budgets/{budget_id}:
+    delete:
+      tags:
+      - budgets
+      summary: Удалить бюджет (admin)
+      operationId: delete_budget_api_v1_budgets__budget_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: budget_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Budget Id
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/budgets/report:
+    get:
+      tags:
+      - budgets
+      summary: План/факт по каждой валюте
+      operationId: budget_report_api_v1_budgets_report_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: period_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/BudgetPeriod'
+          default: month
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+          title: Year
+      - name: month
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 12
+            minimum: 1
+          - type: 'null'
+          title: Month
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetReportOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     AuditLogOut:
@@ -1176,6 +1369,167 @@ components:
       - username
       - password
       title: Body_token_api_v1_auth_token_post
+    BudgetLineOut:
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        budget:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Budget
+          description: Плановая сумма; null — бюджет не задан
+        scheduled:
+          type: string
+          title: Scheduled
+          description: Сумма периодов со сроком в периоде бюджета
+        paid:
+          type: string
+          title: Paid
+        unpaid:
+          type: string
+          title: Unpaid
+        remaining:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Remaining
+          description: Остаток бюджета (бюджет − запланировано, не меньше 0)
+        overrun:
+          type: string
+          title: Overrun
+          description: Превышение бюджета
+        is_over:
+          type: boolean
+          title: Is Over
+        usage_percent:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Usage Percent
+          description: Запланировано / бюджет × 100
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - currency
+      - budget
+      - scheduled
+      - paid
+      - unpaid
+      - remaining
+      - overrun
+      - is_over
+      - usage_percent
+      - count
+      title: BudgetLineOut
+    BudgetOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        period_type:
+          $ref: '#/components/schemas/BudgetPeriod'
+        year:
+          type: integer
+          title: Year
+        month:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Month
+        currency:
+          $ref: '#/components/schemas/Currency'
+        planned_amount:
+          type: string
+          title: Planned Amount
+      type: object
+      required:
+      - id
+      - period_type
+      - year
+      - month
+      - currency
+      - planned_amount
+      title: BudgetOut
+    BudgetPeriod:
+      type: string
+      enum:
+      - month
+      - year
+      title: BudgetPeriod
+    BudgetReportOut:
+      properties:
+        period_type:
+          $ref: '#/components/schemas/BudgetPeriod'
+        year:
+          type: integer
+          title: Year
+        month:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Month
+        date_from:
+          type: string
+          format: date
+          title: Date From
+        date_to:
+          type: string
+          format: date
+          title: Date To
+        lines:
+          items:
+            $ref: '#/components/schemas/BudgetLineOut'
+          type: array
+          title: Lines
+      type: object
+      required:
+      - period_type
+      - year
+      - month
+      - date_from
+      - date_to
+      - lines
+      title: BudgetReportOut
+    BudgetUpsert:
+      properties:
+        period_type:
+          $ref: '#/components/schemas/BudgetPeriod'
+        year:
+          type: integer
+          maximum: 2100.0
+          minimum: 2000.0
+          title: Year
+        month:
+          anyOf:
+          - type: integer
+            maximum: 12.0
+            minimum: 1.0
+          - type: 'null'
+          title: Month
+          description: Обязателен для month, пусто для year
+        currency:
+          $ref: '#/components/schemas/Currency'
+        planned_amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Planned Amount
+          description: Сумма, не больше 2 знаков после запятой
+          examples:
+          - '55000.00'
+      additionalProperties: false
+      type: object
+      required:
+      - period_type
+      - year
+      - currency
+      - planned_amount
+      title: BudgetUpsert
     CalendarDayOut:
       properties:
         date:
