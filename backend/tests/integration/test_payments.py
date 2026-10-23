@@ -197,3 +197,13 @@ def test_summary_counts_overdue(admin, user):
     create_payment(admin, title="Подписка", amount="9.99", currency="EUR", first_due_date="2026-10-19")
     s = {c["currency"]: c for c in user.get("/api/v1/payments/summary").json()["currencies"]}
     assert s["EUR"]["overdue"] == {"amount": "9.99", "count": 1}
+
+
+def test_other_recurrences_via_api(admin):
+    w = create_payment(admin, title="Уборка", amount="3000", first_due_date="2026-10-28", recurrence="weekly")
+    assert [o["due_date"] for o in occurrences_of(admin, w["id"])] == ["2026-10-28", "2026-11-04"]
+    q = create_payment(admin, title="Налог", amount="10000", first_due_date="2026-11-30", recurrence="quarterly")
+    assert [o["due_date"] for o in occurrences_of(admin, q["id"])] == ["2026-11-30", "2027-02-28"]
+    y = create_payment(admin, title="Домен", amount="12", currency="USD", first_due_date="2026-12-01", recurrence="yearly")
+    assert [o["due_date"] for o in occurrences_of(admin, y["id"])] == ["2026-12-01", "2027-12-01"]
+    assert admin.post("/api/v1/recurring-payments", json={"title": "X", "amount": "1", "currency": "RUB", "first_due_date": "2026-11-01", "recurrence": "daily"}).status_code == 422
