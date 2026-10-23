@@ -1,0 +1,32 @@
+[project]
+name = "invoice-keeper"
+version = "1.0.0"
+description = "Invoice Keeper — напоминания о регулярных платежах"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "sqlalchemy>=2.0.32",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "argon2-cffi>=23.1",
+    "httpx>=0.27",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6.0",
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.setuptools]
+packages = []

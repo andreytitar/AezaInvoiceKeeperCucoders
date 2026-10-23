@@ -1,0 +1,73 @@
+name: invoice-keeper
+
+x-app: &app
+  build:
+    context: .
+    target: runtime
+  image: invoice-keeper:local
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-invoice}:${POSTGRES_PASSWORD:-invoice}@db:5432/${POSTGRES_DB:-invoice_keeper}
+  volumes:
+    - uploads:/app/uploads
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-invoice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-invoice}
+      POSTGRES_DB: ${POSTGRES_DB:-invoice_keeper}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    <<: *app
+    command: ["api"]
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3).status == 200 else 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_grace_period: 30s
+
+  # Тесты: docker compose --profile test run --rm tests   (или make test)
+  tests:
+    build:
+      context: .
+      target: test
+    image: invoice-keeper:test
+    profiles: ["test"]
+    environment:
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-invoice}:${POSTGRES_PASSWORD:-invoice}@db:5432/invoice_keeper_test
+      OPENAPI_PATH: /openapi/openapi.yml
+    volumes:
+      - ./backend:/app
+      - ./openapi:/openapi
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
