@@ -36,6 +36,7 @@ MATRIX = [
     ("DELETE", f"/api/v1/webhooks/{RID}", None, False),
     ("GET", f"/api/v1/webhooks/{RID}/deliveries", None, False),
     ("POST", f"/api/v1/webhooks/{RID}/test", None, False),
+    ("POST", "/api/v1/admin/run-checks", None, False),
     ("GET", "/api/v1/users", None, False),
     ("GET", "/api/v1/audit-logs", None, False),
     ("POST", "/api/v1/users", {"login": "newbie", "password": "secret1"}, False),

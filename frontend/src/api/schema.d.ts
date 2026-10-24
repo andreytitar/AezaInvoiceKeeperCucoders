@@ -438,6 +438,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/run-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Проверить сейчас (admin): генерация периодов, напоминания, доставка
+         * @description То же, что делает worker раз в минуту. Идемпотентно и безопасно параллельно с worker.
+         */
+        post: operations["run_checks_now_api_v1_admin_run_checks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -649,6 +669,23 @@ export interface components {
             today: string;
             /** Days */
             days: components["schemas"]["CalendarDayOut"][];
+        };
+        /** CheckResult */
+        CheckResult: {
+            /** Periods Created */
+            periods_created: number;
+            /** Reminders Queued */
+            reminders_queued: number;
+            /** Overdue Events Queued */
+            overdue_events_queued: number;
+            /** Sent */
+            sent: number;
+            /** Failed */
+            failed: number;
+            /** Dead */
+            dead: number;
+            /** Cancelled */
+            cancelled: number;
         };
         /**
          * Currency
@@ -2789,6 +2826,44 @@ export interface operations {
             };
             /** @description Ошибка валидации */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_checks_now_api_v1_admin_run_checks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckResult"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

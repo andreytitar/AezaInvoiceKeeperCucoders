@@ -1554,6 +1554,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/run-checks:
+    post:
+      tags:
+      - admin
+      summary: 'Проверить сейчас (admin): генерация периодов, напоминания, доставка'
+      description: То же, что делает worker раз в минуту. Идемпотентно и безопасно параллельно с worker.
+      operationId: run_checks_now_api_v1_admin_run_checks_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckResult'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
 components:
   schemas:
     AuditLogOut:
@@ -1910,6 +1938,39 @@ components:
       - today
       - days
       title: CalendarOut
+    CheckResult:
+      properties:
+        periods_created:
+          type: integer
+          title: Periods Created
+        reminders_queued:
+          type: integer
+          title: Reminders Queued
+        overdue_events_queued:
+          type: integer
+          title: Overdue Events Queued
+        sent:
+          type: integer
+          title: Sent
+        failed:
+          type: integer
+          title: Failed
+        dead:
+          type: integer
+          title: Dead
+        cancelled:
+          type: integer
+          title: Cancelled
+      type: object
+      required:
+      - periods_created
+      - reminders_queued
+      - overdue_events_queued
+      - sent
+      - failed
+      - dead
+      - cancelled
+      title: CheckResult
     Currency:
       type: string
       enum:

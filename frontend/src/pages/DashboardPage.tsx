@@ -9,6 +9,7 @@ import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../componen
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
 import { CURRENCIES, formatDate, formatMoney } from '../i18n/format'
+import { useAuth } from '../store/auth'
 import { useToast } from '../store/toast'
 
 type Tab = 'topay' | 'overdue' | 'paid' | 'all'
@@ -45,6 +46,7 @@ function loadFilters(): Filters {
 
 export function DashboardPage() {
   const toast = useToast()
+  const { isAdmin } = useAuth()
   const { today, fake } = useServerToday()
   const [f, setF] = useState<Filters>(loadFilters)
   const [page, setPage] = useState(1)
@@ -141,6 +143,25 @@ export function DashboardPage() {
     }
   }
 
+  const runChecks = async () => {
+    setBusy(true)
+    try {
+      const r = unwrap(await api.POST('/api/v1/admin/run-checks'))
+      const parts = [
+        r.sent ? `отправлено уведомлений: ${r.sent}` : null,
+        r.reminders_queued ? `в очереди: ${r.reminders_queued}` : null,
+        r.periods_created ? `новых периодов: ${r.periods_created}` : null,
+        r.failed ? `ошибок отправки: ${r.failed}` : null,
+      ].filter(Boolean)
+      toast(r.failed ? 'error' : 'ok', parts.length ? `Проверка: ${parts.join(', ')}` : 'Проверка: всё уже отправлено, новых напоминаний нет')
+      refresh()
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const pages = list.data ? Math.max(1, Math.ceil(list.data.total / PAGE_SIZE)) : 1
   const hasExtraFilters = f.currency || f.overdue || f.from || f.to || f.q
 
@@ -148,9 +169,16 @@ export function DashboardPage() {
     <>
       <PageTitle
         aside={
-          <span className="text-sm text-ink-soft">
-            Сегодня <span className="num text-ink">{formatDate(today)}</span>
-            {fake && <span className="ml-2 text-amber num text-xs">[APP_FAKE_TODAY]</span>}
+          <span className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-ink-soft">
+              Сегодня <span className="num text-ink">{formatDate(today)}</span>
+              {fake && <span className="ml-2 text-amber num text-xs">[APP_FAKE_TODAY]</span>}
+            </span>
+            {isAdmin && (
+              <button className="btn btn-sm" onClick={runChecks} disabled={busy} title="Сгенерировать периоды и разослать напоминания прямо сейчас">
+                Проверить сейчас
+              </button>
+            )}
           </span>
         }
       >
