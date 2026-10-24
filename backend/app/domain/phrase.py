@@ -31,6 +31,12 @@ RECURRENCE_WORDS = [
 ]
 NUM = r"\d{1,3}(?:[  ]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?"
 
+_ADD_EXAMPLE = "Добавить платёж можно так: /add аренда 55000 руб каждое 5-е"
+
+
+def _phrase_error(problem: str) -> str:
+    return f"{problem} {_ADD_EXAMPLE}"
+
 
 @dataclass(frozen=True)
 class ParsedPayment:
@@ -45,15 +51,17 @@ def _amount(raw: str) -> Decimal:
     try:
         value = Decimal(raw.replace(" ", "").replace(" ", "").replace(",", "."))
     except InvalidOperation:
-        raise ValidationError("Не удалось прочитать сумму") from None
-    if value <= 0 or not has_at_most_two_decimals(value):
-        raise ValidationError("Сумма должна быть больше нуля, не больше 2 знаков после запятой")
+        raise ValidationError(_phrase_error("Не получилось прочитать сумму.")) from None
+    if value <= 0:
+        raise ValidationError(_phrase_error("Укажите сумму больше нуля."))
+    if not has_at_most_two_decimals(value):
+        raise ValidationError(_phrase_error("Укажите не больше двух знаков после запятой."))
     return value
 
 
 def _next_day_of_month(day: int, today: date) -> date:
     if not 1 <= day <= 31:
-        raise ValidationError("Число месяца должно быть от 1 до 31")
+        raise ValidationError(_phrase_error("Укажите день месяца от 1 до 31."))
     d = month_date(today.year, today.month, day)
     return d if d >= today else add_months(today.replace(day=1), 1, day)
 
@@ -84,7 +92,7 @@ def parse_payment_phrase(text: str, today: date) -> ParsedPayment:
         try:
             due = date(year, mm, dd)
         except ValueError:
-            raise ValidationError(f"Нет такой даты: {m.group(0).strip()}") from None
+            raise ValidationError(_phrase_error(f"Нет такой даты: {m.group(0).strip()}.")) from None
         if not yy and due < today:
             due = date(year + 1, mm, dd)
         take(m)
@@ -126,9 +134,9 @@ def parse_payment_phrase(text: str, today: date) -> ParsedPayment:
                 take(m)
                 break
     if amount is None:
-        raise ValidationError("Не нашёл сумму. Пример: /add аренда 55000 руб каждое 5-е")
+        raise ValidationError(_phrase_error("Не вижу сумму."))
     if due is None:
-        raise ValidationError("Не нашёл дату. Пример: «каждое 5-е», «28 числа» или «05.11»")
+        raise ValidationError(_phrase_error("Не вижу дату."))
 
     # название — всё, что осталось
     chars = list(src)
@@ -138,6 +146,6 @@ def parse_payment_phrase(text: str, today: date) -> ParsedPayment:
     title = re.sub(r"\b(с|каждое|каждый|числа|по|за)\b", " ", "".join(chars), flags=re.IGNORECASE)
     title = " ".join(title.replace(",", " ").split()).strip(" -—:")
     if not title:
-        raise ValidationError("Не нашёл название платежа")
+        raise ValidationError(_phrase_error("Не вижу название."))
     title = title[0].upper() + title[1:]
     return ParsedPayment(title[:200], amount, currency or Currency.RUB, due, recurrence)

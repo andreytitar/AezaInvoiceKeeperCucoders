@@ -36,10 +36,15 @@ class TeamOut(OutputModel):
 class MeOut(UserOut):
     is_system: bool
     team: TeamOut
+    invite_code: str | None = Field(
+        default=None,
+        description="Код приглашения временной команды. Виден только её администратору.",
+    )
 
     @classmethod
     def from_user(cls, user: User) -> "MeOut":
         team = user.team
+        invite = team.invite_code if user.role == Role.ADMIN and team.kind == TeamKind.SANDBOX else None
         return cls(
             id=user.id,
             login=user.login,
@@ -56,6 +61,7 @@ class MeOut(UserOut):
                 chat_bound=team.telegram_chat_id is not None,
                 chat_title=team.telegram_chat_title,
             ),
+            invite_code=invite,
         )
 
 

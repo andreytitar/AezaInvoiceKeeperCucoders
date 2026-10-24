@@ -20,12 +20,15 @@ class FakeTelegramClient:
         self.answers.append((callback_query_id, text, show_alert))
 
     async def edit_message_text(self, chat_id, message_id, text, reply_markup=None):
-        self.edits.append((chat_id, message_id, text))
+        self.edits.append((chat_id, message_id, text, reply_markup))
 
     async def get_updates(self, offset, timeout=25):
         await asyncio.sleep(0.01)  # как настоящий long polling: отдаём управление циклу
         batch, self._updates = self._updates, []
         return [u for u in batch if offset is None or u["update_id"] >= offset]
+
+    async def send_chat_action(self, chat_id, action="typing"):
+        return None
 
 
 def press(occurrence_id, tg_user_id, update_id=1, data=None):
@@ -64,9 +67,9 @@ def test_linked_user_marks_paid_and_message_is_edited(admin, user, regular_user,
     r = user.get(f"/api/v1/payment-occurrences/{occ['id']}").json()
     assert r["status"] == "paid" and r["paid_date"] == "2026-10-24"
     assert client.answers == [("cq1", "Отмечено как оплачено", False)]
-    chat, mid, text = client.edits[0]
-    assert (chat, mid) == (-100500, 77) and "Оплачено" in text and "ivan" in text and "24.10.2026" in text
-    assert "<b>55\u00a0000,00\u00a0₽</b>\u00a0(RUB)" in text and "55 000" not in text
+    chat, mid, text, _markup = client.edits[0]
+    assert (chat, mid) == (-100500, 77) and "✅" in text and "ivan" in text and "24.10.2026" in text
+    assert "55\u00a0000\u00a0₽" in text and "55 000" not in text
     log = admin.get("/api/v1/audit-logs", params={"action": "occurrence.paid"}).json()["items"][0]
     assert log["actor_login"] == "ivan" and log["user_agent"] == "telegram-bot"
 
@@ -87,7 +90,8 @@ def test_unlinked_account_rejected_with_alert(admin, user, regular_user, contain
     occ = setup(admin, regular_user)
     client = FakeTelegramClient()
     handle(container, client, press(occ["id"], 999))
-    assert client.answers[0][2] is True and "не привязан" in client.answers[0][1]
+    assert client.answers[0][2] is True
+    assert "в команде" in client.answers[0][1] and "/start" in client.answers[0][1]
     assert client.edits == []
     assert user.get(f"/api/v1/payment-occurrences/{occ['id']}").json()["status"] == "unpaid"
 

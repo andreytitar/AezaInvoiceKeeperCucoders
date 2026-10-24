@@ -28,13 +28,14 @@ def plain_text(n: Notification) -> str:
 
 
 def telegram_html(n: Notification) -> str:
-    head = "Просроченный платёж" if n.days_until_due < 0 else "Напоминание об оплате"
+    if n.days_until_due < 0:
+        head = "🔴 Просроченный платёж"
+    else:
+        head = "⏰ Напоминание об оплате"
     amount = html.escape(format_amount(n.amount, n.currency))
-    # Дата — dd.mm.yyyy без пробелов, сама по себе не рвётся. Код валюты
-    # приклеен к сумме неразрывным пробелом, чтобы «₽» и «(RUB)» не уезжали.
     return (
         f"<b>{head}</b>\n\n"
         f"<b>{html.escape(n.title)}</b>\n"
-        f"Сумма: <b>{amount}</b>{NBSP}({html.escape(n.currency)})\n"
-        f"Дата оплаты: <b>{n.due_date:%d.%m.%Y}</b> — {due_phrase(n.days_until_due)}"
+        f"<b>{amount}</b>{NBSP}({html.escape(n.currency)})\n"
+        f"Срок: <b>{n.due_date:%d.%m.%Y}</b> — {due_phrase(n.days_until_due)}"
     )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response
+from urllib.parse import urlsplit, urlunsplit
+
+from fastapi import APIRouter, Response
 from pydantic import BaseModel
 
 from app.api.deps import ContainerDep, DbDep, UserDep
@@ -15,10 +17,13 @@ class FeedOut(BaseModel):
     webcal_url: str
 
 
-def _urls(request: Request, token: str) -> FeedOut:
-    base = str(request.base_url).rstrip("/")
+def _urls(public_base_url: str, token: str) -> FeedOut:
+    """ICS по PUBLIC_BASE_URL: Google забирает фид со своего сервера и не видит localhost из запроса."""
+    base = (public_base_url or "").strip().rstrip("/") or "http://localhost:8000"
     url = f"{base}/api/v1/calendar/{token}.ics"
-    return FeedOut(url=url, webcal_url="webcal://" + url.split("://", 1)[1])
+    parts = urlsplit(url)
+    webcal_url = urlunsplit(("webcal", parts.netloc, parts.path, "", ""))
+    return FeedOut(url=url, webcal_url=webcal_url)
 
 
 @router.get(
@@ -27,8 +32,8 @@ def _urls(request: Request, token: str) -> FeedOut:
     summary="Личная ссылка на календарь (ICS) для Google/Apple Календаря",
     responses=responses(401),
 )
-def get_feed(request: Request, user: UserDep, c: ContainerDep, db: DbDep) -> FeedOut:
-    return _urls(request, CalendarFeedService(db, c.clock).token_for(user))
+def get_feed(user: UserDep, c: ContainerDep, db: DbDep) -> FeedOut:
+    return _urls(c.settings.public_base_url, CalendarFeedService(db, c.clock).token_for(user))
 
 
 @router.post(
@@ -37,8 +42,8 @@ def get_feed(request: Request, user: UserDep, c: ContainerDep, db: DbDep) -> Fee
     summary="Сменить ссылку на календарь (старая перестанет работать)",
     responses=responses(401),
 )
-def rotate_feed(request: Request, user: UserDep, c: ContainerDep, db: DbDep) -> FeedOut:
-    return _urls(request, CalendarFeedService(db, c.clock).token_for(user, rotate=True))
+def rotate_feed(user: UserDep, c: ContainerDep, db: DbDep) -> FeedOut:
+    return _urls(c.settings.public_base_url, CalendarFeedService(db, c.clock).token_for(user, rotate=True))
 
 
 @router.get(

@@ -75,6 +75,10 @@ def test_team_isolation_and_system_admin_untouchable(admin, app, container):
 
 def test_start_paths_create_invite_and_bind(admin, app, container):
     stranger = send(container, msg("/start", chat_id=9001, tg_id=9001, chat_type="private"))
+    start_text = stranger.messages[0]["text"]
+    assert start_text.startswith("Invoice Keeper напоминает о регулярных платежах. ")
+    assert "За три дня до срока пишет вам, что оплатить, что уже оплачено и что просрочено." in start_text
+    assert "ещё не привязан" in start_text
     buttons = [b["text"] for row in stranger.messages[0]["reply_markup"]["inline_keyboard"] for b in row]
     assert buttons == ["Создать временную команду", "Войти по коду приглашения", "Войти на сайте"]
 
@@ -85,7 +89,9 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
         UserRepository(db).get(ivan_id).telegram_user_id = 111
         db.commit()
     primary = send(container, msg("/start", chat_id=111, tg_id=111, chat_type="private"))
-    assert "/topay" in primary.messages[0]["text"]
+    assert "Invoice Keeper" in primary.messages[0]["text"]
+    menu_btns = [b["text"] for row in primary.messages[0]["reply_markup"]["inline_keyboard"] for b in row]
+    assert "К оплате" in menu_btns
     assert "временн" not in primary.messages[0]["text"].lower()
 
     created = send(
@@ -102,6 +108,8 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
     )
     text = created.messages[0]["text"]
     assert "Открыть панель" in text and "Зайти как сотрудник" in text and "Пригласить" in text
+    urls = [b.get("url") for row in created.messages[0]["reply_markup"]["inline_keyboard"] for b in row]
+    assert any(u and "/api/v1/auth/magic/" in u for u in urls)
     opened = send(container, msg("/start", chat_id=2222, tg_id=2222, chat_type="private", update_id=3))
     assert "Снова открыта" in opened.messages[0]["text"]
     assert "Зайти как сотрудник" in opened.messages[0]["text"]
@@ -111,7 +119,7 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
     joined = send(container, msg(f"/join {code}", chat_id=3333, tg_id=3333, chat_type="private", update_id=4))
     assert "Вы в команде" in joined.messages[0]["text"]
     rejected = send(container, msg(f"/join {code}", chat_id=111, tg_id=111, chat_type="private", update_id=5))
-    assert "Не получилось" in rejected.messages[0]["text"]
+    assert "В команду пока не вошли" in rejected.messages[0]["text"]
 
     bind_ask = send(
         container,
@@ -128,7 +136,7 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
     command = next(line for line in bind_ask.messages[0]["text"].splitlines() if line.startswith("/bind") or "/bind" in line)
     token = command.split()[-1].replace("</code>", "").replace("<code>", "")
     stranger_bind = send(container, msg(f"/bind {token}", chat_id=-100900, tg_id=3333, title="Чужая", update_id=7))
-    assert "Не получилось" in stranger_bind.messages[0]["text"]
+    assert "Чат не привязан" in stranger_bind.messages[0]["text"]
 
     # код уже сожжён неудачной попыткой — берём новый
     bind_ask = send(
@@ -162,7 +170,7 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
     )
     token = bind_ask.messages[0]["text"].split("/bind ")[-1].split("<")[0].strip()
     ok = send(container, msg(f"/bind {token}", chat_id=-100888, tg_id=2222, title="Песочница", update_id=11))
-    assert "будут приходить в этот чат" in ok.messages[0]["text"]
+    assert "Группа привязана" in ok.messages[0]["text"]
     assert any(m["chat_id"] == 2222 and "Песочница" in m["text"] for m in ok.messages)
 
     other = _sandbox(container, 4444)
@@ -173,7 +181,7 @@ def test_start_paths_create_invite_and_bind(admin, app, container):
         ).create_chat_code(other_admin)
         other_code = code_row.code
     clash = send(container, msg(f"/bind {other_code}", chat_id=-100888, tg_id=4444, title="Вторая", update_id=12))
-    assert "Не получилось" in clash.messages[0]["text"]
+    assert "Чат не привязан" in clash.messages[0]["text"]
 
 
 def test_reminder_recipient_is_team_chat_or_admin_dm(admin, container):

@@ -1,44 +1,59 @@
 import type { Summary } from '../api/client'
-import { CURRENCY_NAMES, formatMoney } from '../i18n/format'
+import { CURRENCIES, formatMoney } from '../i18n/format'
 
-/** Итоги отдельными карточками по каждой валюте — без суммирования между валютами. */
+function zero(amount: string) {
+  const n = Number(amount)
+  return !Number.isFinite(n) || n === 0
+}
+
+function Fig({ amount, currency, hot = false }: { amount: string; currency: string; hot?: boolean }) {
+  if (zero(amount)) return <span className="balance-empty">—</span>
+  return <span className={hot ? 'num text-overdue' : 'num'}>{formatMoney(amount, currency)}</span>
+}
+
+/** Три карточки валют. Крупная цифра — «к оплате». */
 export function SummaryCards({ summary }: { summary: Summary }) {
+  const lines = [...summary.currencies].sort(
+    (a, b) =>
+      CURRENCIES.indexOf(a.currency as (typeof CURRENCIES)[number]) -
+      CURRENCIES.indexOf(b.currency as (typeof CURRENCIES)[number]),
+  )
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-rule bg-sheet mb-6">
-      {summary.currencies.map((c, i) => (
-        <section
-          key={c.currency}
-          className={`p-4 ${i > 0 ? 'border-t md:border-t-0 md:border-l border-rule' : ''}`}
-          aria-label={`Итоги, ${CURRENCY_NAMES[c.currency]}`}
-        >
-          <div className="flex items-baseline justify-between">
-            <h2 className="num text-xs uppercase tracking-[0.18em] text-ink-soft">{c.currency}</h2>
-            <span className="text-xs text-ink-soft">{CURRENCY_NAMES[c.currency]}</span>
-          </div>
-          <p className="font-serif text-2xl font-bold mt-1 num" title="К оплате (не оплачено)">
-            {formatMoney(c.unpaid.amount, c.currency)}
+    <section className="summary-cards mb-5 grid grid-cols-1 gap-3 desk:grid-cols-3 desk:gap-4" aria-label="Итоги по валютам">
+      {lines.map((c) => (
+        <section key={c.currency} className="summary-card sheet min-w-0 p-3 desk:p-4 text-ink" aria-label={c.currency}>
+          <p className="balance-kicker">{c.currency}</p>
+          <p className="summary-card__due-label mt-2 desk:mt-3 text-xs font-sans font-medium text-ink-soft">
+            К оплате
           </p>
-          <p className="text-xs text-ink-soft">к оплате · {c.unpaid.count} пер.</p>
-          <dl className="mt-3 text-sm grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
-            <dt className="text-ink-soft">Предстоит</dt>
-            <dd className="num text-right">
-              {formatMoney(c.upcoming.amount, c.currency)} <span className="text-ink-soft">/{c.upcoming.count}</span>
-            </dd>
-            <dt className={c.overdue.count ? 'text-red' : 'text-ink-soft'}>Просрочено</dt>
-            <dd className={`num text-right ${c.overdue.count ? 'text-red font-semibold' : ''}`}>
-              {formatMoney(c.overdue.amount, c.currency)} <span className="text-ink-soft">/{c.overdue.count}</span>
-            </dd>
-            <dt className="text-ink-soft">Оплачено</dt>
-            <dd className="num text-right">
-              {formatMoney(c.paid.amount, c.currency)} <span className="text-ink-soft">/{c.paid.count}</span>
-            </dd>
-            <dt className="text-ink-soft border-t-[3px] border-double border-rule pt-0.5">Всего</dt>
-            <dd className="num text-right border-t-[3px] border-double border-rule pt-0.5">
-              {formatMoney(c.total.amount, c.currency)} <span className="text-ink-soft">/{c.total.count}</span>
-            </dd>
+          <p className={`balance-num break-all ${zero(c.unpaid.amount) ? 'balance-empty' : ''}`}>
+            {zero(c.unpaid.amount) ? '—' : formatMoney(c.unpaid.amount, c.currency)}
+          </p>
+          <dl className="mt-3 text-sm">
+            <div className="flex justify-between gap-3 py-0.5 min-w-0">
+              <dt className="text-ink-soft shrink-0">Предстоит</dt>
+              <dd className="min-w-0 text-right break-all">
+                <Fig amount={c.upcoming.amount} currency={c.currency} />
+                <span className="num text-ink-soft"> · {c.upcoming.count}</span>
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 py-0.5 min-w-0">
+              <dt className="text-ink-soft shrink-0">Просрочено</dt>
+              <dd className="min-w-0 text-right break-all">
+                <Fig amount={c.overdue.amount} currency={c.currency} hot />
+                <span className="num text-ink-soft"> · {c.overdue.count}</span>
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 py-0.5 min-w-0">
+              <dt className="text-ink-soft shrink-0">Оплачено</dt>
+              <dd className="min-w-0 text-right break-all">
+                <Fig amount={c.paid.amount} currency={c.currency} />
+                <span className="num text-ink-soft"> · {c.paid.count}</span>
+              </dd>
+            </div>
           </dl>
         </section>
       ))}
-    </div>
+    </section>
   )
 }

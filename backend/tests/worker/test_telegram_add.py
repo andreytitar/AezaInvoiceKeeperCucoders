@@ -22,7 +22,7 @@ def test_admin_adds_payment_by_phrase_and_undoes(admin, container, fake_channel)
     run(container, msg(cmd, chat_id=777, tg_id=777, chat_type="private"))
     c = run(container, msg("/add сервер aeza 25$ 26 числа", chat_id=777, tg_id=777, chat_type="private"))
     text = c.messages[0]["text"]
-    assert "Сервер aeza" in text and "25,00\u00a0$\u00a0(USD)" in text and "26.10.2026" in text
+    assert "Платёж добавлен" in text and "Сервер aeza" in text and "25,00\u00a0$" in text and "26.10.2026" in text
     payments = admin.get("/api/v1/recurring-payments").json()
     assert [(p["title"], p["amount"], p["currency"]) for p in payments] == [("Сервер aeza", "25.00", "USD")]
     assert len(fake_channel.sent) == 1  # срок через 2 дня — напоминание сразу
@@ -36,15 +36,23 @@ def test_admin_adds_payment_by_phrase_and_undoes(admin, container, fake_channel)
 def test_user_cannot_add(user, regular_user, admin, container):
     admin.patch(f"/api/v1/users/{regular_user.id}", json={"telegram_user_id": 555})
     c = run(container, msg("/add аренда 1000 руб 5 числа", chat_id=555, chat_type="private"))
-    assert "только администратор" in c.messages[0]["text"]
+    text = c.messages[0]["text"]
+    assert "Только администратор" in text and "администратор" in text.lower()
     assert admin.get("/api/v1/recurring-payments").json() == []
+
+
+def test_empty_add_explains_the_form(admin, container):
+    cmd, _ = link_admin(admin)
+    run(container, msg(cmd, chat_id=777, tg_id=777, chat_type="private"))
+    c = run(container, msg("/add", chat_id=777, tg_id=777, chat_type="private"))
+    assert "<b>Добавить платёж</b>" in c.messages[0]["text"] and "/add аренда" in c.messages[0]["text"]
 
 
 def test_bad_phrase(admin, container):
     cmd, _ = link_admin(admin)
     run(container, msg(cmd, chat_id=777, tg_id=777, chat_type="private"))
     c = run(container, msg("/add просто текст", chat_id=777, tg_id=777, chat_type="private"))
-    assert "Не получилось" in c.messages[0]["text"]
+    assert c.messages[0]["text"] == "Не вижу сумму. Добавить платёж можно так: /add аренда 55000 руб каждое 5-е"
 
 
 def test_parse_endpoint(admin):

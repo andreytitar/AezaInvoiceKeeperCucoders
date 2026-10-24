@@ -45,6 +45,13 @@ class AuthService:
         self.sessions = SessionRepository(db)
 
     def login(self, login: str, password: str, ip: str = "unknown") -> LoginResult:
+        user = self.authenticate_password(login, password, ip)
+        result = self._open_session(user)
+        log.info("Успешный вход", extra={"login": user.login, "ip": ip})
+        return result
+
+    def authenticate_password(self, login: str, password: str, ip: str = "unknown") -> User:
+        """Проверяет логин и пароль и не открывает сессию. Неудача пишется в журнал сразу."""
         if self.limiter:
             retry = self.limiter.retry_after(ip, login)
             if retry is not None:
@@ -66,10 +73,11 @@ class AuthService:
             self.limiter.reset(ip, login)
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
+        return user
 
-        result = self._open_session(user)
-        log.info("Успешный вход", extra={"login": user.login, "ip": ip})
-        return result
+    def start_session(self, user: User, action: str = "auth.login") -> LoginResult:
+        self._ensure_team_alive(user)
+        return self._open_session(user, action=action)
 
     def login_magic(self, code: str) -> LoginResult:
         user = TelegramLinkService(self.db, self.clock, self.settings).consume_magic(code)

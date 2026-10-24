@@ -43,7 +43,7 @@ def test_link_user_via_start_deep_link(user, container):
     link = user.post("/api/v1/telegram/link").json()
     assert link["command"].startswith("/start ") and link["url"] is None  # без токена бота ссылки нет
     c = send(container, msg(link["command"], chat_id=555, chat_type="private"))
-    assert "привязан к пользователю <b>ivan</b>" in c.messages[0]["text"]
+    assert "Telegram привязан к <b>ivan</b>" in c.messages[0]["text"]
     assert user.get("/api/v1/auth/me").json()["telegram_user_id"] == 555
     assert user.get("/api/v1/telegram/status").json()["me_linked"] is True
     # код одноразовый
@@ -72,7 +72,7 @@ def test_bind_chat_and_reminders_go_there(admin, user, container):
     code = admin.post("/api/v1/telegram/chat-link").json()
     assert code["command"].startswith("/bind ")
     c = send(container, msg(code["command"] + "", title="Бухгалтерия", tg_id=555))
-    assert "будут приходить в этот чат" in c.messages[0]["text"]
+    assert "Группа привязана" in c.messages[0]["text"]
     st = admin.get("/api/v1/telegram/status").json()
     assert st["chat_bound"] and st["chat_title"] == "Бухгалтерия" and st["chat_source"] == "bind"
     assert chat_provider(container.session_factory, container.settings)() == str(GROUP)
@@ -83,7 +83,7 @@ def test_bind_chat_and_reminders_go_there(admin, user, container):
 def test_bind_with_user_code_fails(user, container):
     code = user.post("/api/v1/telegram/link").json()["code"]
     c = send(container, msg(f"/bind {code}"))
-    assert "Не получилось" in c.messages[0]["text"]
+    assert "Чат не привязан" in c.messages[0]["text"]
 
 
 def bind(admin, container):
@@ -98,10 +98,11 @@ def test_topay_in_bound_chat_with_buttons(admin, user, container):
     create_payment(admin, title="Подписка", amount="9.99", currency="EUR", first_due_date="2026-10-19")
     c = send(container, msg("/topay@InvoiceKeeperBot", tg_id=999))  # участник чата, не привязан
     text = c.messages[0]["text"]
-    assert "Что и когда оплатить" in text and "Сервер" in text and "просрочено 5 дн." in text
-    assert "Итого:" in text and "25,00\u00a0$" in text
+    assert "💳" in text and "К оплате" in text and "Сервер" in text and "просрочено" in text
+    assert "Всего к оплате" in text
     buttons = c.messages[0]["reply_markup"]["inline_keyboard"]
-    assert buttons[0][0]["callback_data"].startswith("lp:")
+    assert any(b["text"].startswith("✅") for row in buttons for b in row)
+    assert buttons[0][0]["callback_data"].startswith("lp:t:")
 
 
 def test_list_button_marks_paid_and_replies(admin, user, regular_user, container):
@@ -116,8 +117,11 @@ def test_list_button_marks_paid_and_replies(admin, user, regular_user, container
                                                  "message": {"message_id": 3, "chat": {"id": GROUP}}}}
         )
     )
-    assert client.edits == []  # список не редактируется
-    assert "отметил(а) ivan" in client.messages[0]["text"] and client.messages[0]["reply_to"] == 3
+    assert len(client.edits) == 1
+    edit_text = client.edits[0][2]
+    assert "Оплачено" in edit_text and "ivan" in edit_text
+    undo = client.edits[0][3]["inline_keyboard"][0][0]
+    assert undo["text"] == "↩️ Отменить" and undo["callback_data"].startswith("unpay:t:")
     assert user.get(f"/api/v1/payment-occurrences/{oid}").json()["status"] == "paid"
 
 
@@ -133,9 +137,12 @@ def test_free_text_questions_in_private(admin, regular_user, container):
     c = send(container, msg("Что у нас просрочено?", chat_id=555, chat_type="private"))
     assert "Просрочено" in c.messages[0]["text"] and "Подписка" in c.messages[0]["text"]
     c = send(container, msg("покажи итоги", chat_id=555, chat_type="private"))
-    assert "Итоги на 24.10.2026" in c.messages[0]["text"] and "EUR" in c.messages[0]["text"]
+    assert "Сводка" in c.messages[0]["text"] and "24.10.2026" in c.messages[0]["text"] and "EUR" in c.messages[0]["text"]
+    assert c.messages[0]["reply_markup"]["inline_keyboard"][-1][0]["text"] == "🏠 В меню"
     c = send(container, msg("абракадабра", chat_id=555, chat_type="private"))
-    assert "Не понял" in c.messages[0]["text"]
+    assert c.messages[0]["text"] == (
+        "Пока не разобрал сообщение. Напишите, например, «что просрочено» или откройте /help."
+    )
 
 
 def test_paid_and_week_and_summary(admin, user, regular_user, container, clock):
@@ -143,15 +150,21 @@ def test_paid_and_week_and_summary(admin, user, regular_user, container, clock):
     p = create_payment(admin, title="Аренда", amount="55000", first_due_date="2026-10-28")
     oid = occurrences_of(admin, p["id"])[0]["id"]
     w = send(container, msg("/week", chat_id=555, chat_type="private")).messages[0]["text"]
-    assert "Аренда" in w and "через 4 дн." in w
+    assert "Аренда" in w and "через 4" in w
     user.patch(f"/api/v1/payment-occurrences/{oid}", json={"status": "paid"})
     pd = send(container, msg("/paid", chat_id=555, chat_type="private")).messages[0]["text"]
-    assert "оплачено 24.10" in pd and "55\u00a0000,00\u00a0₽" in pd
-    assert "55 000" not in pd
+    assert "Аренда" in pd and "55\u00a0000\u00a0₽" in pd
+    assert ",00" not in pd
     sm = send(container, msg("/summary", chat_id=555, chat_type="private")).messages[0]["text"]
     assert "<b>RUB</b>" in sm and "USD" not in sm
 
 
 def test_help(container):
     c = send(container, msg("/help", chat_id=1, chat_type="private"))
-    assert "/topay" in c.messages[0]["text"]
+    text = c.messages[0]["text"]
+    assert "/topay" in text
+    assert "Invoice Keeper" in text and "/topay" in text
+    fallback = send(container, msg("абракадабра", chat_id=1, chat_type="private", update_id=2))
+    assert fallback.messages[0]["text"] == (
+        "Пока не разобрал сообщение. Напишите, например, «что просрочено» или откройте /help."
+    )

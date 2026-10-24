@@ -39,7 +39,23 @@ def test_day_31_clamped():
     assert parse_payment_phrase("аренда 1000 каждое 31-е", date(2026, 11, 2)).first_due_date == date(2026, 11, 30)
 
 
-@pytest.mark.parametrize("text", ["аренда каждое 5-е", "аренда 1000", "55000 руб 5 числа", "аренда 1000 руб 31.02", "аренда 1.555 руб 5 числа"])
-def test_errors(text):
-    with pytest.raises(ValidationError):
+EXAMPLE = "Добавить платёж можно так: /add аренда 55000 руб каждое 5-е"
+
+
+@pytest.mark.parametrize(
+    "text, message",
+    [
+        ("аренда каждое 5-е", f"Не вижу сумму. {EXAMPLE}"),
+        ("аренда 1000", f"Не вижу дату. {EXAMPLE}"),
+        ("55000 руб 5 числа", f"Не вижу название. {EXAMPLE}"),
+        ("аренда 1000 руб 31.02", f"Нет такой даты: 31.02. {EXAMPLE}"),
+        ("аренда 1.555 руб 5 числа", f"Не вижу сумму. {EXAMPLE}"),
+        ("аренда 0 руб 5 числа", f"Укажите сумму больше нуля. {EXAMPLE}"),
+        ("аренда 1000 каждое 32-е", f"Укажите день месяца от 1 до 31. {EXAMPLE}"),
+    ],
+)
+def test_errors(text, message):
+    with pytest.raises(ValidationError) as exc:
         parse_payment_phrase(text, TODAY)
+    assert exc.value.message == message
+    assert not exc.value.message.startswith("аренда")

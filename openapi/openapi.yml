@@ -133,6 +133,274 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/telegram/config:
+    get:
+      tags:
+      - auth
+      summary: Настроена ли кнопка входа через Telegram
+      description: Если имя бота в настройках пустое, а токен задан, имя запрашивается у Telegram (getMe) и кэшируется.
+      operationId: telegram_config_api_v1_auth_telegram_config_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramLoginConfig'
+  /api/v1/auth/telegram/deeplink:
+    post:
+      tags:
+      - auth
+      summary: Ссылка t.me для входа через бота
+      description: Создаёт одноразовый код на 10 минут и кладёт его в HttpOnly-cookie. Ссылка открывает бота с /start weblogin_<код>.
+        Домен и HTTPS не нужны.
+      operationId: telegram_deeplink_api_v1_auth_telegram_deeplink_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramDeepLinkOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/telegram/deeplink/status:
+    post:
+      tags:
+      - auth
+      summary: Опрос подтверждения входа через бота
+      description: 'Пока пользователь не нажал Start, статус waiting. После Start — та же развилка, что у /start: привязанный
+        Telegram получает HttpOnly-сессию, непривязанный — экран выбора на сайте.'
+      operationId: telegram_deeplink_status_api_v1_auth_telegram_deeplink_status_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramLoginResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/telegram/pending:
+    get:
+      tags:
+      - auth
+      summary: Есть ли незавершённый вход через Telegram
+      description: После виджета, если аккаунт ещё не привязан, браузер хранит HttpOnly-cookie. Сессии панели при этом нет.
+      operationId: telegram_pending_api_v1_auth_telegram_pending_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramPendingOut'
+  /api/v1/auth/telegram:
+    post:
+      tags:
+      - auth
+      summary: Вход по Telegram Login Widget
+      description: Проверяет hash виджета (HMAC-SHA256, секрет — SHA256 токена бота) и отвергает auth_date старше суток. Привязанный
+        Telegram открывает сессию этого пользователя. Непривязанный получает статус unlinked и может создать временную команду,
+        ввести код приглашения или привязать существующий логин.
+      operationId: telegram_login_api_v1_auth_telegram_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramWidgetAuth'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramLoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/telegram/cancel:
+    post:
+      tags:
+      - auth
+      summary: Забыть незавершённый вход через Telegram
+      operationId: telegram_cancel_api_v1_auth_telegram_cancel_post
+      responses:
+        '204':
+          description: Successful Response
+  /api/v1/auth/telegram/sandbox:
+    post:
+      tags:
+      - auth
+      summary: Создать временную команду и войти её администратором
+      description: 'Тот же TeamService, что и кнопка бота «Создать временную команду»: администратор, сотрудник, демо-платежи,
+        24 часа.'
+      operationId: telegram_sandbox_api_v1_auth_telegram_sandbox_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Слишком много временных команд
+  /api/v1/auth/telegram/join:
+    post:
+      tags:
+      - auth
+      summary: Войти по коду приглашения временной команды
+      description: 'Те же правила, что у /join в боте: код песочницы, срок, один Telegram — одна команда. Роль нового участника
+        — user.'
+      operationId: telegram_join_api_v1_auth_telegram_join_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteCodeRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/telegram/link:
+    post:
+      tags:
+      - auth
+      summary: Привязать Telegram к уже существующему логину
+      description: Пароль проверяется как при обычном входе, затем Telegram id из виджета записывается в этот профиль. Новый
+        администратор основной команды не создаётся.
+      operationId: telegram_link_account_api_v1_auth_telegram_link_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Слишком много попыток
+  /api/v1/auth/sandbox/employee:
+    post:
+      tags:
+      - auth
+      summary: Зайти как сотрудник временной команды
+      description: Сменяет сессию администратора песочницы на заранее созданного сотрудника той же команды.
+      operationId: sandbox_employee_api_v1_auth_sandbox_employee_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
   /api/v1/auth/logout:
     post:
       tags:
@@ -2419,6 +2687,18 @@ components:
       - timezone
       - fake_today
       title: HealthResponse
+    InviteCodeRequest:
+      properties:
+        code:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Code
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      title: InviteCodeRequest
     LinkCode:
       properties:
         code:
@@ -2509,6 +2789,12 @@ components:
           title: Is System
         team:
           $ref: '#/components/schemas/TeamOut'
+        invite_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invite Code
+          description: Код приглашения временной команды. Виден только её администратору.
       type: object
       required:
       - id
@@ -2963,6 +3249,77 @@ components:
       - chat_bound
       - chat_title
       title: TeamOut
+    TelegramDeepLinkOut:
+      properties:
+        code:
+          type: string
+          title: Code
+        url:
+          type: string
+          title: Url
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - code
+      - url
+      - expires_at
+      title: TelegramDeepLinkOut
+    TelegramLoginConfig:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        bot_username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Bot Username
+        token_configured:
+          type: boolean
+          title: Token Configured
+          default: false
+      type: object
+      required:
+      - enabled
+      title: TelegramLoginConfig
+    TelegramLoginResponse:
+      properties:
+        status:
+          type: string
+          enum:
+          - authenticated
+          - unlinked
+          - waiting
+          title: Status
+        access_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        user:
+          anyOf:
+          - $ref: '#/components/schemas/MeOut'
+          - type: 'null'
+      type: object
+      required:
+      - status
+      title: TelegramLoginResponse
+    TelegramPendingOut:
+      properties:
+        pending:
+          type: boolean
+          title: Pending
+      type: object
+      required:
+      - pending
+      title: TelegramPendingOut
     TelegramStatus:
       properties:
         enabled:
@@ -3000,6 +3357,55 @@ components:
       - chat_source
       - me_linked
       title: TelegramStatus
+    TelegramWidgetAuth:
+      properties:
+        id:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Id
+          description: Telegram user id из виджета, не ввод с клавиатуры
+        auth_date:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Auth Date
+        hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-fA-F]{64}$
+          title: Hash
+        first_name:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+          title: Last Name
+        username:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Username
+        photo_url:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
+          title: Photo Url
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - auth_date
+      - hash
+      title: TelegramWidgetAuth
+      description: 'Поля Telegram Login Widget. Лишние ключи сохраняются: они входят в подпись.'
     TokenResponse:
       properties:
         access_token:

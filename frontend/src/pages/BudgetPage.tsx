@@ -10,58 +10,49 @@ import { useToast } from '../store/toast'
 type Line = Schemas['BudgetLineOut']
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
-function Bar({ value, max, over }: { value: number; max: number; over: boolean }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
-  return (
-    <div className="h-2.5 border border-ink rounded-sm overflow-hidden bg-sheet" aria-hidden>
-      <div className={`h-full ${over ? 'bg-red' : 'bg-ink'}`} style={{ width: `${pct}%` }} />
-    </div>
-  )
+function zero(amount: string) {
+  const n = Number(amount)
+  return !Number.isFinite(n) || n === 0
 }
 
-function LineCard({ l }: { l: Line }) {
-  const budget = l.budget ? Number(l.budget) : 0
+function Fig({ amount, currency }: { amount: string; currency: string }) {
+  if (zero(amount)) return <span className="balance-empty">—</span>
+  return <span className="num">{formatMoney(amount, currency)}</span>
+}
+
+function LineCol({ l }: { l: Line }) {
   return (
-    <section className="p-4" aria-label={`Бюджет, ${CURRENCY_NAMES[l.currency]}`}>
-      <div className="flex justify-between items-baseline">
-        <h3 className="num text-xs uppercase tracking-[0.18em] text-ink-soft">{l.currency}</h3>
-        {l.is_over && <span className="text-xs font-semibold text-red">! превышение</span>}
-      </div>
-      {l.budget === null ? (
-        <p className="font-serif text-lg mt-1 text-ink-soft">Бюджет не задан</p>
-      ) : (
-        <p className="font-serif text-2xl font-bold mt-1 num">{formatMoney(l.budget, l.currency)}</p>
-      )}
-      <div className="mt-3 space-y-2">
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span>Запланировано ({l.count} пер.)</span>
-            <span className="num">{formatMoney(l.scheduled, l.currency)}{l.usage_percent !== null && <span className="text-ink-soft"> · {l.usage_percent}%</span>}</span>
-          </div>
-          {l.budget !== null && <Bar value={Number(l.scheduled)} max={budget} over={l.is_over} />}
+    <section className="sheet min-w-0 p-4" aria-label={`Бюджет, ${CURRENCY_NAMES[l.currency]}`}>
+      <p className="balance-kicker">{l.currency}</p>
+      <p className="mt-3 text-xs font-sans font-semibold uppercase tracking-[0.14em] text-ink-soft">к оплате</p>
+      <p className={`balance-num break-all ${zero(l.unpaid) ? 'balance-empty' : ''}`}>{zero(l.unpaid) ? '—' : formatMoney(l.unpaid, l.currency)}</p>
+      <dl className="mt-3 text-sm">
+        <div className="flex justify-between gap-3 py-0.5">
+          <dt className="text-ink-soft">Бюджет</dt>
+          <dd>{l.budget === null ? <span className="balance-empty">—</span> : <Fig amount={l.budget} currency={l.currency} />}</dd>
         </div>
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span>Оплачено</span>
-            <span className="num">{formatMoney(l.paid, l.currency)}</span>
-          </div>
-          {l.budget !== null && <Bar value={Number(l.paid)} max={budget} over={false} />}
+        <div className="sum-line mt-1 flex justify-between gap-3 py-0.5">
+          <dt className="text-ink-soft">Запланировано</dt>
+          <dd>
+            <Fig amount={l.scheduled} currency={l.currency} /> <span className="num text-ink-soft">{l.count}</span>
+            {l.usage_percent !== null && <span className="num text-ink-soft"> · {l.usage_percent}%</span>}
+          </dd>
         </div>
-      </div>
-      <dl className="mt-3 text-sm grid grid-cols-[1fr_auto] gap-y-0.5 border-t-[3px] border-double border-rule pt-1">
-        <dt className="text-ink-soft">Осталось оплатить</dt>
-        <dd className="num text-right">{formatMoney(l.unpaid, l.currency)}</dd>
+        <div className="flex justify-between gap-3 py-0.5">
+          <dt className="text-ink-soft">Оплачено</dt>
+          <dd><Fig amount={l.paid} currency={l.currency} /></dd>
+        </div>
         {l.remaining !== null && (
-          <>
+          <div className="flex justify-between gap-3 py-0.5">
             <dt className="text-ink-soft">Остаток бюджета</dt>
-            <dd className="num text-right">{formatMoney(l.remaining, l.currency)}</dd>
-          </>
+            <dd><Fig amount={l.remaining} currency={l.currency} /></dd>
+          </div>
         )}
         {l.is_over && (
-          <>
-            <dt className="text-red">Превышение</dt>
-            <dd className="num text-right text-red font-semibold">{formatMoney(l.overrun, l.currency)}</dd>
-          </>
+          <div className="flex justify-between gap-3 py-0.5">
+            <dt className="font-semibold">Превышение</dt>
+            <dd className="num font-semibold">{formatMoney(l.overrun, l.currency)}</dd>
+          </div>
         )}
       </dl>
     </section>
@@ -127,20 +118,36 @@ export function BudgetPage() {
   }
 
   return (
-    <>
+    <div className="win-window min-w-0 max-w-full">
+      <div className="win-titlebar">Бюджет</div>
+      <div className="min-w-0 bg-paper-2 px-2 pt-2 pb-3 text-ink">
       <PageTitle
+        hideTitleOnDesk
         aside={
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex border border-ink rounded-sm" role="radiogroup" aria-label="Период">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex shrink-0 gap-2" role="radiogroup" aria-label="Период">
               {(['month', 'year'] as const).map((t) => (
-                <button key={t} role="radio" aria-checked={type === t} className={`px-3 py-1 text-sm ${type === t ? 'bg-ink text-paper' : ''}`} onClick={() => setType(t)}>
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={type === t}
+                  className={`btn h-11 min-h-11 w-28 shrink-0 rounded-sm px-3 leading-none ${type === t ? 'btn-primary' : ''}`}
+                  onClick={() => setType(t)}
+                >
                   {t === 'month' ? 'Месяц' : 'Год'}
                 </button>
               ))}
             </div>
-            <button className="btn btn-sm" onClick={() => shift(-1)} aria-label="Назад">←</button>
-            <span className="font-serif text-lg font-bold min-w-[9rem] text-center">{type === 'month' ? `${MONTHS[month - 1]} ${year}` : year}</span>
-            <button className="btn btn-sm" onClick={() => shift(1)} aria-label="Вперёд">→</button>
+            <div className="inline-flex items-center gap-2">
+              <button type="button" className="btn h-11 min-h-11 w-11 shrink-0 px-0 text-2xl leading-none" onClick={() => shift(-1)} aria-label="Назад">
+                ‹
+              </button>
+              <span className="min-w-[7.5rem] whitespace-nowrap text-center font-sans text-lg font-semibold">{type === 'month' ? `${MONTHS[month - 1]} ${year}` : year}</span>
+              <button type="button" className="btn h-11 min-h-11 w-11 shrink-0 px-0 text-2xl leading-none" onClick={() => shift(1)} aria-label="Вперёд">
+                ›
+              </button>
+            </div>
           </div>
         }
       >
@@ -152,16 +159,16 @@ export function BudgetPage() {
         <Loading />
       ) : (
         <>
-          <div className={`grid grid-cols-1 md:grid-cols-3 border border-rule bg-sheet divide-y md:divide-y-0 md:divide-x divide-rule ${report.loading ? 'opacity-60' : ''}`}>
-            {report.data.lines.map((l) => <LineCard key={l.currency} l={l} />)}
+          <div className={`grid grid-cols-1 gap-3 desk:grid-cols-3 ${report.loading ? 'opacity-60' : ''}`}>
+            {report.data.lines.map((l) => <LineCol key={l.currency} l={l} />)}
           </div>
           <p className="text-xs text-ink-soft mt-2">
             Запланировано — сумма периодов со сроком в этом {type === 'month' ? 'месяце' : 'году'}. Валюты не конвертируются.
           </p>
           {isAdmin && (
-            <form onSubmit={save} className="sheet p-5 mt-6 max-w-2xl">
-              <h2 className="font-serif text-lg font-bold mb-3">Плановые суммы</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <form onSubmit={save} className="sheet p-4 mt-6 min-w-0">
+              <h2 className="font-sans text-lg font-semibold mb-3">Плановые суммы</h2>
+              <div className="grid grid-cols-1 desk:grid-cols-3 gap-3">
                 {CURRENCIES.map((c) => (
                   <div key={c}>
                     <label className="label" htmlFor={`b-${c}`}>{c}</label>
@@ -174,6 +181,7 @@ export function BudgetPage() {
           )}
         </>
       )}
-    </>
+      </div>
+    </div>
   )
 }

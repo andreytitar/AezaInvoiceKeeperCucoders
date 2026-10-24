@@ -9,11 +9,6 @@ export function loadTheme(): Theme {
   } catch {
     /* хранилище недоступно */
   }
-  try {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'
-  } catch {
-    /* ignore */
-  }
   return 'light'
 }
 

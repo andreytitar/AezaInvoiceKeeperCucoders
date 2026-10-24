@@ -18,8 +18,8 @@ from app.container import Container, build_container
 from app.infrastructure.logging import setup_logging
 from app.models import WorkerHeartbeat
 from app.infrastructure.channels.telegram import TelegramClient
-from app.services.bot_answers import BOT_COMMANDS
 from app.services.scheduler import run_checks
+from app.services.telegram_profile import apply_telegram_profile
 from app.services.telegram_updates import TelegramUpdateHandler
 
 log = logging.getLogger("app.worker")
@@ -71,9 +71,9 @@ class Worker:
 
         async def run() -> None:
             try:
-                await client.set_my_commands(BOT_COMMANDS)
+                await apply_telegram_profile(client)
             except Exception as exc:  # noqa: BLE001
-                log.warning("setMyCommands: %s", exc)
+                log.warning("профиль бота: %s", exc)
             await TelegramUpdateHandler(self.c, client).poll_forever(self.stop_event)
 
         return asyncio.create_task(run())

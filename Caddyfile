@@ -1,0 +1,7 @@
+aezainvoicekeepercucoders.fun {
+	reverse_proxy app:8000
+}
+
+www.aezainvoicekeepercucoders.fun {
+	redir https://aezainvoicekeepercucoders.fun{uri}
+}

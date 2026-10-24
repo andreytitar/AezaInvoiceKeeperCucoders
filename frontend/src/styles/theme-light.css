@@ -1,0 +1,317 @@
+/*
+  Светлая тема. Цвета и шрифты — из «Аеза_Гайдбук_2026.pdf».
+  AEZA-BRAND.md на момент сборки не было.
+  Хром окна — старый Windows: пиксель, выпуклый bevel, цветная плашка заголовка.
+  Цветового градиента нет. Декоративного крестика на плашке нет.
+
+  Основные цвета, стр. 15:
+    #000000  PANTONE BLACK C        текст, графика, фон          R0 G0 B0
+    #4CC6F1  PANTONE 298 C          основной светло-голубой      R76 G198 B241
+    #F4F4F4  PANTONE COOL GRAY 1 C  нейтральный серый, фоны      R244 G244 B244
+
+  Дополнительные, стр. 16:
+    #182D48  PANTONE 534 C          интерфейсы, вспомогательная графика  R24 G45 B72
+    #E97C35  PANTONE 7579 C         тёплый акцент                        R233 G124 B53
+    #ECCFDB  PANTONE 503 C          в книге есть; в этой теме не используется (пыльная розовая плашка)
+
+  #FFFFFF — белый грунт иконки, стр. 13 («чёрный на белом»). В таблице палитры отдельного hex нет.
+
+  Шрифты, стр. 18–19:
+    Exo 2     — основной: заголовки, текст, интерфейсы
+    Inter 18pt — дополнительный: подписи, пояснения, короткие блоки (семейство Google Fonts: Inter)
+
+  Shell-агенту, подключить оба начертания (wordmark и интерфейс, не пиксельный дисплейный шрифт):
+    https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap
+
+  В гайдбуке нет красного, зелёного и моноширинного.
+  --overdue #9C2F2F и --paid #24564A оставлены цветами статусов продукта:
+  просрочка — красный и только она, оплачено — зелёный.
+  Суммы: IBM Plex Mono, табличные цифры.
+*/
+
+html[data-theme="light"],
+html:not([data-theme]) {
+  --paper: #f4f4f4;
+  --paper-2: #ffffff;
+  --ink: #000000;
+  --ink-soft: #182d48;
+  --rule: #182d48;
+  --overdue: #9c2f2f;
+  --paid: #24564a;
+
+  --font-serif: "Exo 2", sans-serif;
+  --font-sans: "Exo 2", "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  color-scheme: light;
+}
+
+html[data-theme="light"] .num,
+html:not([data-theme]) .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+html[data-theme="light"] .label,
+html:not([data-theme]) .label {
+  font-family: "Inter", sans-serif;
+}
+
+html[data-theme="light"],
+html[data-theme="light"] body,
+html:not([data-theme]),
+html:not([data-theme]) body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/*
+  Мобильная оболочка (<720px): плоский светлый AEZA-кабинет, без тёмного хрома кабинета
+  и без рамки win-window. Desktop (desk:) не затрагивается.
+*/
+@media (max-width: 719px) {
+  html[data-theme="light"] .shell-root,
+  html[data-theme="light"] .shell-frame,
+  html[data-theme="light"] main.shell-canvas,
+  html[data-theme="light"] header.shell-mobile-head,
+  html[data-theme="light"] nav.shell-tabs,
+  html[data-theme="light"] .shell-foot > footer,
+  html:not([data-theme]) .shell-root,
+  html:not([data-theme]) .shell-frame,
+  html:not([data-theme]) main.shell-canvas,
+  html:not([data-theme]) header.shell-mobile-head,
+  html:not([data-theme]) nav.shell-tabs,
+  html:not([data-theme]) .shell-foot > footer {
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--rule);
+    box-shadow: none;
+  }
+
+  html[data-theme="light"] .shell-frame.win-window,
+  html:not([data-theme]) .shell-frame.win-window {
+    border: 0;
+    box-shadow: none;
+    background: var(--paper);
+  }
+
+  html[data-theme="light"] .shell-frame .win-titlebar,
+  html:not([data-theme]) .shell-frame .win-titlebar {
+    display: none;
+  }
+
+  html[data-theme="light"] header.shell-mobile-head .shell-brand a,
+  html:not([data-theme]) header.shell-mobile-head .shell-brand a {
+    color: var(--ink);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  html[data-theme="light"] nav.shell-tabs .shell-tab,
+  html:not([data-theme]) nav.shell-tabs .shell-tab {
+    color: var(--ink-soft);
+    border-top-color: transparent;
+  }
+
+  html[data-theme="light"] nav.shell-tabs a.shell-tab[aria-current="page"],
+  html[data-theme="light"] nav.shell-tabs button.shell-tab[data-current="true"],
+  html:not([data-theme]) nav.shell-tabs a.shell-tab[aria-current="page"],
+  html:not([data-theme]) nav.shell-tabs button.shell-tab[data-current="true"] {
+    color: var(--ink);
+    border-top-color: #4cc6f1;
+    font-weight: 600;
+  }
+
+  html[data-theme="light"] dialog#more-sheet,
+  html:not([data-theme]) dialog#more-sheet {
+    background: var(--paper-2);
+    color: var(--ink);
+    border-color: var(--rule);
+    box-shadow: none;
+  }
+
+  html[data-theme="light"] .shell-canvas .win-window,
+  html:not([data-theme]) .shell-canvas .win-window {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  html[data-theme="light"] .shell-canvas .win-window > .win-titlebar,
+  html:not([data-theme]) .shell-canvas .win-window > .win-titlebar {
+    display: none;
+  }
+
+  html[data-theme="light"] header.shell-mobile-head,
+  html:not([data-theme]) header.shell-mobile-head {
+    border-bottom-color: var(--rule);
+  }
+}
+
+/* Серая плашка Cool Gray 1, снаружи 2px чёрный, bevel: свет сверху-слева, tьма снизу-справа. */
+.win-window {
+  background: #f4f4f4;
+  color: #000000;
+  border: 2px solid #000000;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #ffffff,
+    inset -2px -2px 0 #182d48;
+}
+
+/* Цветная плашка заголовка — основной акцент #4CC6F1. Текст чёрный, шрифт интерфейса. */
+.win-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 3px 8px;
+  background: #4cc6f1;
+  color: #000000;
+  border-bottom: 2px solid #000000;
+  border-radius: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+/* Выпуклая пиксельная кнопка. Кегль интерфейса Exo 2, не пиксельная «морда». */
+.win-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.4rem 0.9rem;
+  border: 2px solid #000000;
+  border-radius: 0;
+  background: #f4f4f4;
+  color: #000000;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow:
+    inset 2px 2px 0 #ffffff,
+    inset -2px -2px 0 #182d48;
+}
+
+.win-btn:active {
+  box-shadow:
+    inset 2px 2px 0 #182d48,
+    inset -2px -2px 0 #ffffff;
+}
+
+.win-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.win-btn:focus-visible {
+  outline: 2px solid #4cc6f1;
+  outline-offset: 2px;
+}
+
+/*
+  Сетка календаря. Только светлая тема.
+  Ступени серого: пустой день #FFFFFF, за 3 дня #F4F4F4, день платежа #8A8F98.
+  Просрочка внутри сетки — #5C6168, не #9C2F2F и не #000000 / #161615.
+  Списки и легенда вне [data-cal-grid] красную просрочку сохраняют.
+*/
+html[data-theme="light"] [data-cal-grid],
+html:not([data-theme]) [data-cal-grid] {
+  background: #ffffff;
+  border-color: #d0d3d7;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:first-child,
+html:not([data-theme]) [data-cal-grid] > div:first-child,
+html[data-theme="light"] [data-cal-grid] .border-rule,
+html:not([data-theme]) [data-cal-grid] .border-rule {
+  border-color: #d0d3d7;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div,
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div {
+  background-color: #ffffff;
+  color: #4a4e55;
+  border-color: #d0d3d7;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div[data-tone="d3"],
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div[data-tone="d3"] {
+  background-color: #f4f4f4;
+  color: #4a4e55;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div[data-tone="d2"],
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div[data-tone="d2"] {
+  background-color: #e4e6e9;
+  color: #4a4e55;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div[data-tone="d1"],
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div[data-tone="d1"] {
+  background-color: #c5c8cd;
+  color: #4a4e55;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div[data-tone="pay"],
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div[data-tone="pay"] {
+  background-color: #8a8f98;
+  color: #ffffff;
+}
+
+html[data-theme="light"] [data-cal-grid] > div:nth-child(2) > div[data-tone="overdue"],
+html:not([data-theme]) [data-cal-grid] > div:nth-child(2) > div[data-tone="overdue"] {
+  background-color: #5c6168;
+  color: #f4f4f4;
+}
+
+html[data-theme="light"] [data-cal-grid] .text-ink-soft,
+html:not([data-theme]) [data-cal-grid] .text-ink-soft,
+html[data-theme="light"] [data-cal-grid] .text-ink,
+html:not([data-theme]) [data-cal-grid] .text-ink {
+  color: #4a4e55;
+}
+
+html[data-theme="light"] [data-cal-grid] .text-overdue,
+html:not([data-theme]) [data-cal-grid] .text-overdue {
+  color: #5c6168;
+}
+
+html[data-theme="light"] [data-cal-grid] [data-tone="pay"] .text-ink-soft,
+html:not([data-theme]) [data-cal-grid] [data-tone="pay"] .text-ink-soft,
+html[data-theme="light"] [data-cal-grid] [data-tone="pay"] .text-overdue,
+html:not([data-theme]) [data-cal-grid] [data-tone="pay"] .text-overdue,
+html[data-theme="light"] [data-cal-grid] [data-tone="pay"] .text-paper,
+html:not([data-theme]) [data-cal-grid] [data-tone="pay"] .text-paper,
+html[data-theme="light"] [data-cal-grid] [data-tone="overdue"] .text-ink-soft,
+html:not([data-theme]) [data-cal-grid] [data-tone="overdue"] .text-ink-soft,
+html[data-theme="light"] [data-cal-grid] [data-tone="overdue"] .text-overdue,
+html:not([data-theme]) [data-cal-grid] [data-tone="overdue"] .text-overdue,
+html[data-theme="light"] [data-cal-grid] [data-tone="overdue"] .text-paper,
+html:not([data-theme]) [data-cal-grid] [data-tone="overdue"] .text-paper {
+  color: #f4f4f4;
+}
+
+html[data-theme="light"] [data-cal-grid] .bg-ink,
+html:not([data-theme]) [data-cal-grid] .bg-ink {
+  background-color: #8a8f98;
+  color: #ffffff;
+}
+
+html[data-theme="light"] [data-cal-grid] .bg-paper,
+html:not([data-theme]) [data-cal-grid] .bg-paper {
+  background-color: #ffffff;
+  color: #4a4e55;
+}
+
+html[data-theme="light"] [data-cal-grid] :focus-visible,
+html:not([data-theme]) [data-cal-grid] :focus-visible {
+  outline-color: #8a8f98;
+}

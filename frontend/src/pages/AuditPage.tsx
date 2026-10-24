@@ -48,7 +48,7 @@ function Changes({ e }: { e: Entry }) {
   const rows = keys.filter((k) => fmtVal(before[k]) !== fmtVal(after[k]) || !e.before)
   if (!rows.length) return <span className="text-ink-soft">—</span>
   return (
-    <dl className="text-xs num grid grid-cols-[auto_1fr] gap-x-2">
+    <dl className="text-xs num grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 min-w-0">
       {rows.slice(0, 6).map((k) => (
         <div key={k} className="contents">
           <dt className="text-ink-soft">{k}</dt>
@@ -80,7 +80,7 @@ export function AuditPage() {
   return (
     <>
       <PageTitle>Журнал действий</PageTitle>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 items-end">
+      <div className="grid grid-cols-1 desk:grid-cols-4 gap-2 mb-4 items-end">
         <div>
           <label className="label" htmlFor="a-act">Действие</label>
           <select id="a-act" className="field" value={f.action} onChange={(e) => set({ action: e.target.value })}>
@@ -100,7 +100,7 @@ export function AuditPage() {
           <input id="a-to" type="date" className="field num" value={f.to} onChange={(e) => set({ to: e.target.value })} />
         </div>
       </div>
-      <div className="sheet overflow-x-auto">
+      <div className="sheet min-w-0">
         {list.error ? (
           <div className="p-4"><ErrorNote text={list.error} onRetry={list.reload} /></div>
         ) : !list.data ? (
@@ -108,43 +108,62 @@ export function AuditPage() {
         ) : list.data.items.length === 0 ? (
           <Empty title="Записей нет" />
         ) : (
-          <table className={`ledger w-full min-w-[820px] ${list.loading ? 'opacity-60' : ''}`}>
-            <thead>
-              <tr>
-                <th>Время</th>
-                <th>Кто</th>
-                <th>Действие</th>
-                <th>Изменения</th>
-                <th>IP / клиент</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className={`hand-only px-3 ${list.loading ? 'opacity-60' : ''}`}>
               {list.data.items.map((e) => (
-                <tr key={e.id} className="align-top">
-                  <td className="num text-xs whitespace-nowrap">{timeFmt.format(new Date(e.at))}</td>
-                  <td className="text-sm">{e.actor_login ?? '—'}</td>
-                  <td className="text-sm">
-                    <span className={e.action.includes('failed') || e.action.includes('dead') || e.action.includes('blocked') ? 'text-red font-semibold' : ''}>
-                      {ACTIONS[e.action] ?? e.action}
-                    </span>
-                    <span className="block text-xs text-ink-soft num">{e.action}</span>
-                  </td>
-                  <td className="max-w-[22rem]"><Changes e={e} /></td>
-                  <td className="text-xs text-ink-soft">
-                    <span className="num">{e.ip ?? '—'}</span>
-                    {e.user_agent && <span className="block truncate max-w-[12rem]" title={e.user_agent}>{e.user_agent}</span>}
-                  </td>
-                </tr>
+                <li key={e.id} className="slip">
+                  <div className="slip-row">
+                    <span className="font-semibold min-w-0">{ACTIONS[e.action] ?? e.action}</span>
+                    <span className="num text-xs">{timeFmt.format(new Date(e.at))}</span>
+                  </div>
+                  <div className="slip-row text-sm">
+                    <span>{e.actor_login ?? '—'}</span>
+                    <span className="num text-ink-soft">{e.ip ?? '—'}</span>
+                  </div>
+                  <p className="num text-xs text-ink-soft break-all">{e.action}</p>
+                  <Changes e={e} />
+                  {e.user_agent && <p className="text-xs text-ink-soft break-all">{e.user_agent}</p>}
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+            <table className={`ledger desk-only w-full table-fixed ${list.loading ? 'opacity-60' : ''}`}>
+              <thead>
+                <tr>
+                  <th>Время</th>
+                  <th>Кто</th>
+                  <th>Действие</th>
+                  <th>Изменения</th>
+                  <th>IP / клиент</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.items.map((e) => (
+                  <tr key={e.id} className="align-top">
+                    <td className="num text-xs">{timeFmt.format(new Date(e.at))}</td>
+                    <td className="text-sm">{e.actor_login ?? '—'}</td>
+                    <td className="text-sm">
+                      <span className={e.action.includes('failed') || e.action.includes('dead') || e.action.includes('blocked') ? 'font-semibold' : ''}>
+                        {ACTIONS[e.action] ?? e.action}
+                      </span>
+                      <span className="block text-xs text-ink-soft num break-all">{e.action}</span>
+                    </td>
+                    <td className="min-w-0"><Changes e={e} /></td>
+                    <td className="text-xs text-ink-soft">
+                      <span className="num">{e.ip ?? '—'}</span>
+                      {e.user_agent && <span className="block break-all" title={e.user_agent}>{e.user_agent}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
       {list.data && list.data.total > PAGE_SIZE && (
-        <nav className="flex justify-end items-center gap-2 mt-3 text-sm" aria-label="Страницы">
-          <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Назад</button>
+        <nav className="flex flex-wrap justify-end items-center gap-2 mt-3 text-sm" aria-label="Страницы">
+          <button className="btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>Назад</button>
           <span className="num">{page} / {pages}</span>
-          <button className="btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Вперёд →</button>
+          <button className="btn" disabled={page >= pages} onClick={() => setPage(page + 1)}>Вперёд</button>
         </nav>
       )}
     </>

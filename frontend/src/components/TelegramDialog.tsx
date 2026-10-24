@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, unwrap, type Schemas } from '../api/client'
 import { useAuth } from '../store/auth'
 import { useToast } from '../store/toast'
+import { dialogBtnCls, dialogCls } from './ui'
 
 type Status = Schemas['TelegramStatus']
 type Code = Schemas['LinkCode']
@@ -9,11 +10,11 @@ type Code = Schemas['LinkCode']
 function CopyLine({ text }: { text: string }) {
   const toast = useToast()
   return (
-    <div className="flex gap-2 items-center mt-2">
-      <code className="num text-sm border border-rule bg-paper px-2 py-1 rounded-sm flex-1 break-all select-all">{text}</code>
+    <div className="flex flex-col gap-2 mt-2 desk:flex-row desk:items-center">
+      <code className="num text-sm border border-rule bg-paper px-2 py-1 rounded-sm min-w-0 break-all select-all">{text}</code>
       <button
         type="button"
-        className="btn btn-sm"
+        className={dialogBtnCls}
         onClick={() => {
           navigator.clipboard?.writeText(text).then(() => toast('ok', 'Скопировано'), () => toast('error', 'Не удалось скопировать'))
         }}
@@ -68,9 +69,9 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
   }
 
   return (
-    <dialog ref={ref} onClose={onClose} className="sheet m-auto w-[min(94vw,32rem)] p-0 text-ink backdrop:bg-black/40 shadow-[4px_4px_0_var(--ink)]" aria-labelledby="tg-title">
-      <div className="p-5">
-        <h2 id="tg-title" className="font-serif text-xl font-bold">Telegram</h2>
+    <dialog ref={ref} onClose={onClose} className={`${dialogCls} win-window`} aria-labelledby="tg-title">
+      <div className="p-4">
+        <h2 id="tg-title" className="font-sans text-xl font-semibold">Telegram</h2>
         {!status ? (
           <p className="text-sm text-ink-soft num mt-3">Загрузка…</p>
         ) : (
@@ -92,7 +93,7 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
                 <>
                   <p className="text-sm mt-1">Привяжите Telegram, чтобы отмечать оплату кнопкой и спрашивать бота в личке.</p>
                   {!myCode ? (
-                    <button className="btn btn-primary btn-sm mt-2" onClick={linkMe}>Привязать Telegram</button>
+                    <button className={`${dialogBtnCls} btn-primary mt-2`} onClick={linkMe}>Привязать Telegram</button>
                   ) : myCode.url ? (
                     <p className="text-sm mt-2">
                       Откройте <a className="underline" href={myCode.url} target="_blank" rel="noopener">{myCode.url}</a> и нажмите «Start».
@@ -108,6 +109,17 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
               )}
             </section>
 
+            {isAdmin && me && me.team?.kind === 'sandbox' && me.invite_code && (
+              <section className="mt-4 border-t border-rule pt-3">
+                <h3 className="font-semibold">Пригласить коллегу</h3>
+                <p className="text-sm mt-1">
+                  На сайте коллега выбирает «Войти по коду приглашения». В боте отправляет команду ниже.
+                </p>
+                <CopyLine text={me.invite_code} />
+                <CopyLine text={`/join ${me.invite_code}`} />
+              </section>
+            )}
+
             {isAdmin && (
               <section className="mt-4 border-t border-rule pt-3">
                 <h3 className="font-semibold">Чат для напоминаний</h3>
@@ -121,10 +133,10 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
                 </p>
                 {!chatCode ? (
                   <span className="flex flex-wrap gap-2 mt-2">
-                    <button className="btn btn-sm" onClick={bindChat}>{status.chat_bound ? 'Подключить другой чат' : 'Подключить чат'}</button>
+                    <button className={dialogBtnCls} onClick={bindChat}>{status.chat_bound ? 'Подключить другой чат' : 'Подключить чат'}</button>
                     {status.chat_bound && (
                       <button
-                        className="btn btn-sm btn-ghost"
+                        className={`${dialogBtnCls} btn-ghost`}
                         onClick={async () => {
                           const r = await api.POST('/api/v1/admin/send-digest')
                           toast(r.data?.sent ? 'ok' : 'error', r.data?.sent ? 'Сводка отправлена в чат' : 'Сводку отправить не удалось')
@@ -162,7 +174,7 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
           </>
         )}
         <div className="mt-5 flex justify-end">
-          <button className="btn" onClick={onClose}>Закрыть</button>
+          <button className={dialogBtnCls} onClick={onClose}>Закрыть</button>
         </div>
       </div>
     </dialog>

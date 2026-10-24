@@ -5,6 +5,8 @@ type AuthState = {
   me: Me | null
   loading: boolean
   login: (login: string, password: string) => Promise<void>
+  adopt: (user: Me) => void
+  enterAsEmployee: () => Promise<void>
   logout: () => Promise<void>
   isAdmin: boolean
 }
@@ -31,13 +33,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe(data.user)
   }, [])
 
+  const adopt = useCallback((user: Me) => {
+    setMe(user)
+  }, [])
+
+  const enterAsEmployee = useCallback(async () => {
+    const data = unwrap(await api.POST('/api/v1/auth/sandbox/employee'))
+    setMe(data.user)
+  }, [])
+
   const logout = useCallback(async () => {
     await api.POST('/api/v1/auth/logout')
     setMe(null)
   }, [])
 
   return (
-    <AuthCtx.Provider value={{ me, loading, login, logout, isAdmin: me?.role === 'admin' }}>{children}</AuthCtx.Provider>
+    <AuthCtx.Provider value={{ me, loading, login, adopt, enterAsEmployee, logout, isAdmin: me?.role === 'admin' }}>
+      {children}
+    </AuthCtx.Provider>
   )
 }
 

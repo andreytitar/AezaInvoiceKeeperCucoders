@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # --- Telegram ---
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
+    # Имя бота без @. Пусто — сервер узнает его через getMe, если задан токен.
+    telegram_bot_username: str | None = None
     telegram_api_base: str = "https://api.telegram.org"
     telegram_polling_enabled: bool = True
     # Публичный адрес панели: одноразовые ссылки из бота ведут сюда
@@ -86,8 +88,8 @@ class Settings(BaseSettings):
         return v
 
     @field_validator(
-        "telegram_bot_token", "telegram_chat_id", "app_fake_today", "smtp_host", "smtp_user", "smtp_password",
-        "chat_webhook_url",
+        "telegram_bot_token", "telegram_chat_id", "telegram_bot_username", "app_fake_today",
+        "smtp_host", "smtp_user", "smtp_password", "chat_webhook_url",
         mode="before",
     )
     @classmethod
@@ -107,6 +109,11 @@ class Settings(BaseSettings):
     @property
     def telegram_enabled(self) -> bool:
         return bool(self.telegram_bot_token)
+
+    @property
+    def telegram_login_bot(self) -> str | None:
+        raw = (self.telegram_bot_username or "").strip().lstrip("@")
+        return raw or None
 
 
 @lru_cache

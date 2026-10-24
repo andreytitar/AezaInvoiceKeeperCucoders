@@ -18,6 +18,8 @@ from app.models import Role, Session, User
 from app.services.auth import AuthService
 
 SESSION_COOKIE = "ik_session"
+TELEGRAM_PENDING_COOKIE = "ik_tg_pending"
+WEB_LOGIN_COOKIE = "ik_tg_web"
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 oauth2_scheme = OAuth2PasswordBearer(
@@ -60,6 +62,11 @@ def _origin_matches_host(request: Request) -> bool:
         return True
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
     return urlsplit(source).netloc.lower() == host.split(",")[0].strip().lower()
+
+
+def assert_browser_origin(request: Request) -> None:
+    if request.method in UNSAFE_METHODS and not _origin_matches_host(request):
+        raise Forbidden("Запрос с чужого источника отклонён (CSRF)", code="csrf_failed")
 
 
 def get_auth(

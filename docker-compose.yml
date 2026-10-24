@@ -51,6 +51,22 @@ services:
         condition: service_healthy
     stop_grace_period: 30s
 
+  # HTTPS для домена: сертификат Let's Encrypt, когда A-запись смотрит на этот сервер.
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Демо-почта: docker compose --profile demo-mail up -d  ->  веб-интерфейс http://localhost:8025
   # (в .env: SMTP_HOST=mailpit, SMTP_PORT=1025, SMTP_SECURITY=none)
   mailpit:
@@ -80,3 +96,5 @@ services:
 volumes:
   pgdata:
   uploads:
+  caddy_data:
+  caddy_config:

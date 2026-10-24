@@ -1,11 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, unwrap, type Occurrence } from '../api/client'
+import { needsPayConfirm } from '../components/largePayment'
 import { MarkPaidDialog } from '../components/MarkPaidDialog'
+import { PaymentRowActions } from '../components/PaymentRowActions'
 import { ReceiptDialog } from '../components/ReceiptDialog'
-import { OverdueCell, StatusCell } from '../components/Status'
+import { OverdueCell, StatusCell, amountHot } from '../components/Status'
 import { SummaryCards } from '../components/SummaryCards'
 import { Upcoming } from '../components/Upcoming'
-import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../components/ui'
+import {
+  ConfirmDialog,
+  Empty,
+  ErrorNote,
+  FilterField,
+  FilterFieldAction,
+  Loading,
+  PageTitle,
+  filterActionBtnCls,
+  filterControlCls,
+  paymentsFilterRowCls,
+} from '../components/ui'
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
 import { CURRENCIES, formatDate, formatMoney } from '../i18n/format'
@@ -25,14 +38,28 @@ type Filters = {
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'topay', label: 'Что оплатить' },
+  { id: 'topay', label: 'К оплате' },
   { id: 'overdue', label: 'Просрочено' },
   { id: 'paid', label: 'Оплачено' },
-  { id: 'all', label: 'Все периоды' },
+  { id: 'all', label: 'Все' },
+]
+const SORTS: { id: Sort; label: string }[] = [
+  { id: 'due_date', label: 'Срок, раньше' },
+  { id: '-due_date', label: 'Срок, позже' },
+  { id: 'amount', label: 'Сумма по возрастанию' },
+  { id: '-amount', label: 'Сумма по убыванию' },
+  { id: 'title', label: 'Название, А–Я' },
+  { id: '-title', label: 'Название, Я–А' },
+  { id: 'paid_date', label: 'Дата оплаты, раньше' },
+  { id: '-paid_date', label: 'Дата оплаты, позже' },
 ]
 const DEFAULT: Filters = { tab: 'topay', currency: '', overdue: '', from: '', to: '', q: '', sort: 'due_date' }
 const STORE_KEY = 'ik-dashboard-filters'
 const PAGE_SIZE = 25
+
+type PendingAction =
+  | { kind: 'unpay'; occurrence: Occurrence }
+  | { kind: 'pay'; occurrence: Occurrence; paidDate: string }
 
 function loadFilters(): Filters {
   try {
@@ -51,10 +78,11 @@ export function DashboardPage() {
   const [f, setF] = useState<Filters>(loadFilters)
   const [page, setPage] = useState(1)
   const [paying, setPaying] = useState<Occurrence | null>(null)
-  const [unpaying, setUnpaying] = useState<Occurrence | null>(null)
+  const [pending, setPending] = useState<PendingAction | null>(null)
   const [receiptFor, setReceiptFor] = useState<Occurrence | null>(null)
   const [busy, setBusy] = useState(false)
   const [version, setVersion] = useState(0)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -116,6 +144,7 @@ export function DashboardPage() {
       )
       toast('ok', `«${o.title}» — оплата отмечена`)
       setPaying(null)
+      setPending(null)
       refresh()
     } catch (e) {
       toast('error', e instanceof Error ? e.message : 'Ошибка')
@@ -134,31 +163,12 @@ export function DashboardPage() {
         }),
       )
       toast('ok', `«${o.title}» — оплата отменена`)
-      setUnpaying(null)
+      setPending(null)
       refresh()
     } catch (e) {
       toast('error', e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setBusy(false)
-    }
-  }
-
-  const qrInput = useRef<HTMLInputElement>(null)
-  const scanReceipt = async (file: File) => {
-    setBusy(true)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch('/api/v1/receipts/scan', { method: 'POST', body: form, credentials: 'same-origin' })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body?.error?.message ?? `Ошибка ${res.status}`)
-      toast(body.status === 'matched' ? 'ok' : 'error', body.message)
-      if (body.status === 'matched') refresh()
-    } catch (e) {
-      toast('error', e instanceof Error ? e.message : 'Ошибка')
-    } finally {
-      setBusy(false)
-      if (qrInput.current) qrInput.current.value = ''
     }
   }
 
@@ -181,36 +191,33 @@ export function DashboardPage() {
     }
   }
 
+  const startMarkPaid = (o: Occurrence, paidDate: string) => {
+    if (needsPayConfirm(o.status, o.amount, o.currency)) {
+      setPending({ kind: 'pay', occurrence: o, paidDate })
+      return
+    }
+    void markPaid(o, paidDate)
+  }
+
   const pages = list.data ? Math.max(1, Math.ceil(list.data.total / PAGE_SIZE)) : 1
   const hasExtraFilters = f.currency || f.overdue || f.from || f.to || f.q
 
   return (
     <>
+      <div className="win-window min-w-0 max-w-full">
+        <div className="win-titlebar">Платежи</div>
+        <div className="dashboard-body min-w-0 bg-paper-2 px-3 pt-2 pb-3 text-ink desk:px-4">
       <PageTitle
+        hideTitleOnDesk
         aside={
-          <span className="flex items-center gap-3 flex-wrap">
+          <span className="flex items-center gap-2 flex-wrap desk:ml-auto">
             <span className="text-sm text-ink-soft">
-              Сегодня <span className="num text-ink">{formatDate(today)}</span>
-              {fake && <span className="ml-2 text-amber num text-xs">[APP_FAKE_TODAY]</span>}
+              <span className="num text-ink">{formatDate(today)}</span>
+              {fake && <span className="ml-2 num text-xs text-ink-soft">[fake]</span>}
             </span>
-            <input
-              ref={qrInput}
-              type="file"
-              accept="image/png,image/jpeg,application/pdf"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && scanReceipt(e.target.files[0])}
-            />
-            <button
-              className="btn btn-sm"
-              onClick={() => qrInput.current?.click()}
-              disabled={busy}
-              title="Фото или PDF кассового чека: сумма и дата берутся из QR, оплата отмечается сама"
-            >
-              Чек по QR
-            </button>
             {isAdmin && (
-              <button className="btn btn-sm" onClick={runChecks} disabled={busy} title="Сгенерировать периоды и разослать напоминания прямо сейчас">
-                Проверить сейчас
+              <button className="btn btn-primary btn-sm desk:min-h-[44px]" onClick={runChecks} disabled={busy} title="Периоды и напоминания сейчас">
+                Проверить
               </button>
             )}
           </span>
@@ -227,49 +234,73 @@ export function DashboardPage() {
         <Loading />
       )}
 
-      <Upcoming today={today} version={version} busy={busy} onPay={(o) => markPaid(o, today)} />
+      <Upcoming today={today} version={version} busy={busy} onPay={(o) => startMarkPaid(o, today)} />
 
-      <div className="flex flex-wrap gap-x-1 gap-y-2 mb-3" role="tablist" aria-label="Что показать">
+      <div className="mb-3 flex gap-1 overflow-x-auto pb-0.5" role="tablist" aria-label="Что показать">
         {TABS.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={f.tab === t.id}
             onClick={() => set({ tab: t.id })}
-            className={`px-3 py-1.5 text-sm border-b-2 ${
-              f.tab === t.id ? 'border-ink font-semibold' : 'border-transparent text-ink-soft hover:text-ink'
-            } ${t.id === 'overdue' ? 'text-red' : ''}`}
+            className={`shrink-0 rounded-sm px-2.5 py-1.5 text-sm min-h-[44px] desk:min-h-0 ${
+              f.tab === t.id ? 'bg-ink font-semibold text-paper-2' : 'text-ink-soft hover:text-ink'
+            }`}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-2 items-end mb-4">
-        <div className="col-span-2 md:col-span-1">
-          <label className="label" htmlFor="f-q">
-            Поиск
-          </label>
-          <input id="f-q" className="field" placeholder="Название" value={f.q} onChange={(e) => set({ q: e.target.value })} />
-        </div>
-        <div>
-          <label className="label" htmlFor="f-cur">
-            Валюта
-          </label>
-          <select id="f-cur" className="field" value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
+      <div className="hand-only mb-4">
+        <label className="label" htmlFor="f-sort">
+          Сортировка
+        </label>
+        <select id="f-sort" className="field" value={f.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
+          {SORTS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="hand-only mb-2">
+        <button
+          type="button"
+          className="btn btn-ghost flex w-full min-h-[44px] items-center justify-between gap-2 px-2"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <span>Фильтры{hasExtraFilters ? ' · активны' : ''}</span>
+          <span className="text-ink-soft" aria-hidden="true">
+            {filtersOpen ? '▴' : '▾'}
+          </span>
+        </button>
+      </div>
+
+      <div className={`payments-filters ${paymentsFilterRowCls} ${filtersOpen ? '' : 'hand:hidden'}`}>
+        <FilterField label="Поиск" htmlFor="f-q">
+          <input
+            id="f-q"
+            className={filterControlCls}
+            placeholder="Название"
+            value={f.q}
+            onChange={(e) => set({ q: e.target.value })}
+          />
+        </FilterField>
+        <FilterField label="Валюта" htmlFor="f-cur">
+          <select id="f-cur" className={filterControlCls} value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
             <option value="">Все</option>
             {CURRENCIES.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="f-over">
-            Просрочка
-          </label>
+        </FilterField>
+        <FilterField label="Просрочка" htmlFor="f-over">
           <select
             id="f-over"
-            className="field"
+            className={filterControlCls}
             value={f.tab === 'overdue' ? 'true' : f.overdue}
             disabled={f.tab === 'overdue'}
             onChange={(e) => set({ overdue: e.target.value as Filters['overdue'] })}
@@ -278,29 +309,32 @@ export function DashboardPage() {
             <option value="true">С просрочкой</option>
             <option value="false">Без просрочки</option>
           </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="f-from">
-            Срок с
-          </label>
-          <input id="f-from" type="date" className="field num" value={f.from} onChange={(e) => set({ from: e.target.value })} />
-        </div>
-        <div>
-          <label className="label" htmlFor="f-to">
-            по
-          </label>
-          <input id="f-to" type="date" className="field num" value={f.to} onChange={(e) => set({ to: e.target.value })} />
-        </div>
-        <button
-          className="btn btn-sm btn-ghost col-span-2 md:col-span-1"
-          disabled={!hasExtraFilters}
-          onClick={() => set({ currency: '', overdue: '', from: '', to: '', q: '' })}
-        >
-          Сбросить
-        </button>
+        </FilterField>
+        <FilterField label="Срок с" htmlFor="f-from">
+          <input
+            id="f-from"
+            type="date"
+            className={`${filterControlCls} num`}
+            value={f.from}
+            onChange={(e) => set({ from: e.target.value })}
+          />
+        </FilterField>
+        <FilterField label="По" htmlFor="f-to">
+          <input id="f-to" type="date" className={`${filterControlCls} num`} value={f.to} onChange={(e) => set({ to: e.target.value })} />
+        </FilterField>
+        <FilterFieldAction label="Сбросить">
+          <button
+            type="button"
+            className={filterActionBtnCls}
+            disabled={!hasExtraFilters}
+            onClick={() => set({ currency: '', overdue: '', from: '', to: '', q: '' })}
+          >
+            Сбросить
+          </button>
+        </FilterFieldAction>
       </div>
 
-      <div className="sheet overflow-x-auto">
+      <div className="payments-list-sheet sheet min-w-0 desk:rounded-sm">
         {list.error ? (
           <div className="p-4">
             <ErrorNote text={list.error} onRetry={list.reload} />
@@ -314,38 +348,35 @@ export function DashboardPage() {
           />
         ) : (
           <>
-          <ul className={`md:hidden divide-y divide-rule ${list.loading ? 'opacity-60' : ''}`}>
+          <ul className={`hand-only ${list.loading ? 'opacity-60' : ''}`}>
             {list.data.items.map((o) => (
-              <li key={o.id} className="p-3">
-                <div className="flex justify-between gap-3">
-                  <span className="font-semibold">{o.title}</span>
-                  <span className="num whitespace-nowrap">{formatMoney(o.amount, o.currency)}</span>
+              <li key={o.id} className="slip">
+                <div className="slip-row">
+                  <span className="font-semibold min-w-0">{o.title}</span>
+                  <span className={`num min-w-0 break-all text-right ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
-                  <span className="num text-ink-soft">срок {formatDate(o.due_date)}</span>
+                <div className="slip-row text-sm">
+                  <span className="num">срок {formatDate(o.due_date)}</span>
                   <StatusCell o={o} />
+                </div>
+                <div className="slip-row text-sm">
                   <OverdueCell o={o} />
+                  {o.paid_date && <span className="num text-ink-soft">оплачено {formatDate(o.paid_date)}</span>}
                 </div>
-                {o.paid_date && <p className="text-xs text-ink-soft mt-1 num">оплачено {formatDate(o.paid_date)}</p>}
                 {o.recurring_payment_deleted && <p className="text-xs text-ink-soft">платёж прекращён</p>}
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {o.status === 'unpaid' ? (
-                    <>
-                      <button className="btn btn-sm btn-primary" onClick={() => markPaid(o, today)} disabled={busy}>Оплачено</button>
-                      <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy}>Дата…</button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy}>Изменить дату</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => setUnpaying(o)} disabled={busy}>Отменить оплату</button>
-                    </>
-                  )}
-                  <button className="btn btn-sm btn-ghost" onClick={() => setReceiptFor(o)}>{o.has_receipt ? 'Чек ✓' : 'Чек'}</button>
-                </div>
+                <PaymentRowActions
+                  occurrence={o}
+                  busy={busy}
+                  placement="slip"
+                  onPaidToday={() => startMarkPaid(o, today)}
+                  onPickDate={() => setPaying(o)}
+                  onReceipt={() => setReceiptFor(o)}
+                  onUnpay={() => setPending({ kind: 'unpay', occurrence: o })}
+                />
               </li>
             ))}
           </ul>
-          <table className={`ledger hidden md:table w-full min-w-[760px] ${list.loading ? 'opacity-60' : ''}`}>
+          <table className={`ledger desk-only w-full ${list.loading ? 'opacity-60' : ''}`}>
             <thead>
               <tr>
                 <th aria-sort={ariaSort('title')}>
@@ -363,7 +394,7 @@ export function DashboardPage() {
                   <button onClick={() => toggleSort('paid_date')}>Дата оплаты{sortMark('paid_date')}</button>
                 </th>
                 <th>Просрочка</th>
-                <th className="text-right">
+                <th className="w-px whitespace-nowrap text-right">
                   <span className="sr-only">Действия</span>
                 </th>
               </tr>
@@ -374,7 +405,7 @@ export function DashboardPage() {
                   <td>
                     <span className="font-semibold">{o.title}</span>
                     {o.has_receipt && (
-                      <button className="ml-2 num text-[0.65rem] uppercase tracking-wider border border-ink-soft text-ink-soft px-1 rounded-sm align-middle" onClick={() => setReceiptFor(o)} title="Открыть чек">
+                      <button className="ml-2 text-xs uppercase tracking-wider text-ink-soft align-middle" onClick={() => setReceiptFor(o)} title="Открыть чек">
                         чек
                       </button>
                     )}
@@ -384,44 +415,26 @@ export function DashboardPage() {
                       </span>
                     )}
                   </td>
-                  <td className="num text-right whitespace-nowrap">{formatMoney(o.amount, o.currency)}</td>
+                  <td className={`num text-right ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</td>
                   <td className="num text-sm">{o.currency}</td>
-                  <td className="num text-sm whitespace-nowrap">{formatDate(o.due_date)}</td>
+                  <td className="num text-sm">{formatDate(o.due_date)}</td>
                   <td>
                     <StatusCell o={o} />
                   </td>
-                  <td className="num text-sm whitespace-nowrap">{formatDate(o.paid_date)}</td>
+                  <td className="num text-sm">{formatDate(o.paid_date)}</td>
                   <td>
                     <OverdueCell o={o} />
                   </td>
-                  <td className="text-right whitespace-nowrap">
-                    <button className="btn btn-sm btn-ghost mr-1" onClick={() => setReceiptFor(o)} aria-label={`Чек для «${o.title}»`}>
-                      Чек
-                    </button>
-                    {o.status === 'unpaid' ? (
-                      <span className="inline-flex gap-1">
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => markPaid(o, today)}
-                          disabled={busy}
-                          title="Отметить оплату сегодняшней датой"
-                        >
-                          Оплачено
-                        </button>
-                        <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy} aria-label={`Выбрать дату оплаты для «${o.title}»`}>
-                          Дата…
-                        </button>
-                      </span>
-                    ) : (
-                      <span className="inline-flex gap-1">
-                        <button className="btn btn-sm" onClick={() => setPaying(o)} disabled={busy}>
-                          Изменить дату
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => setUnpaying(o)} disabled={busy}>
-                          Отменить оплату
-                        </button>
-                      </span>
-                    )}
+                  <td className="w-px whitespace-nowrap text-right">
+                    <PaymentRowActions
+                      occurrence={o}
+                      busy={busy}
+                      placement="table"
+                      onPaidToday={() => startMarkPaid(o, today)}
+                      onPickDate={() => setPaying(o)}
+                      onReceipt={() => setReceiptFor(o)}
+                      onUnpay={() => setPending({ kind: 'unpay', occurrence: o })}
+                    />
                   </td>
                 </tr>
               ))}
@@ -432,23 +445,25 @@ export function DashboardPage() {
       </div>
 
       {list.data && list.data.total > PAGE_SIZE && (
-        <nav className="flex items-center justify-between mt-3 text-sm" aria-label="Страницы">
+        <nav className="flex flex-col gap-2 desk:flex-row desk:items-center desk:justify-between mt-3 text-sm" aria-label="Страницы">
           <span className="text-ink-soft">
             Всего: <span className="num">{list.data.total}</span>
           </span>
-          <span className="flex items-center gap-2">
-            <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              ← Назад
+          <span className="flex flex-wrap items-center gap-2">
+            <button className="btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Назад
             </button>
             <span className="num">
               {page} / {pages}
             </span>
-            <button className="btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-              Вперёд →
+            <button className="btn" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+              Вперёд
             </button>
           </span>
         </nav>
       )}
+        </div>
+      </div>
 
       <MarkPaidDialog
         occurrence={paying}
@@ -459,14 +474,30 @@ export function DashboardPage() {
       />
       <ReceiptDialog occurrence={receiptFor} onClose={() => setReceiptFor(null)} onChanged={list.reload} />
       <ConfirmDialog
-        open={!!unpaying}
-        title="Отменить оплату?"
-        body={unpaying && `«${unpaying.title}», срок ${formatDate(unpaying.due_date)}. Фактическая дата оплаты будет очищена.`}
-        confirmText="Отменить оплату"
-        danger
+        open={!!pending}
+        title={pending?.kind === 'pay' ? 'Отметить оплату?' : 'Отменить оплату?'}
+        body={
+          pending?.kind === 'pay' ? (
+            <>
+              <span className="text-ink">«{pending.occurrence.title}»</span>
+              {' · '}
+              <span className={`num ${amountHot(pending.occurrence) ? 'text-overdue' : 'text-ink'}`}>
+                {formatMoney(pending.occurrence.amount, pending.occurrence.currency)}
+              </span>
+            </>
+          ) : (
+            pending && `«${pending.occurrence.title}», срок ${formatDate(pending.occurrence.due_date)}. Фактическая дата оплаты будет очищена.`
+          )
+        }
+        confirmText={pending?.kind === 'pay' ? 'Отметить' : 'Отменить оплату'}
+        danger={pending?.kind === 'unpay'}
         busy={busy}
-        onConfirm={() => unpaying && markUnpaid(unpaying)}
-        onClose={() => setUnpaying(null)}
+        onConfirm={() => {
+          if (!pending) return
+          if (pending.kind === 'pay') void markPaid(pending.occurrence, pending.paidDate)
+          else void markUnpaid(pending.occurrence)
+        }}
+        onClose={() => setPending(null)}
       />
     </>
   )

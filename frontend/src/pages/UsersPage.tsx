@@ -76,10 +76,13 @@ export function UsersPage() {
 
   return (
     <>
-      <PageTitle>Пользователи</PageTitle>
-      <div className="grid lg:grid-cols-[22rem_1fr] gap-6 items-start">
+      <div className="win-window min-w-0 max-w-full">
+        <div className="win-titlebar">Пользователи</div>
+        <div className="min-w-0 bg-paper-2 px-2 pt-2 pb-3 text-ink">
+      <PageTitle hideTitleOnDesk>Пользователи</PageTitle>
+      <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 items-start">
         <form onSubmit={submit} className="sheet p-5">
-          <h2 className="font-serif text-lg font-bold mb-3">{editing ? `Изменить ${editing.login}` : 'Новый пользователь'}</h2>
+          <h2 className="font-sans text-lg font-semibold mb-3">{editing ? `Изменить ${editing.login}` : 'Новый пользователь'}</h2>
           <label className="label" htmlFor="u-login">
             Логин
           </label>
@@ -124,7 +127,7 @@ export function UsersPage() {
           />
           <p className="text-xs text-ink-soft mb-4">Нужен, чтобы отмечать оплату кнопкой в Telegram. Узнать id: бот @userinfobot.</p>
           {error && (
-            <p className="text-sm text-red mb-3" role="alert">
+            <p className="text-sm text-ink mb-3" role="alert">
               {error}
             </p>
           )}
@@ -140,7 +143,7 @@ export function UsersPage() {
           </div>
         </form>
 
-        <div className="sheet overflow-x-auto">
+        <div className="sheet min-w-0">
           {list.error ? (
             <div className="p-4">
               <ErrorNote text={list.error} onRetry={list.reload} />
@@ -150,40 +153,62 @@ export function UsersPage() {
           ) : list.data.length === 0 ? (
             <Empty title="Пользователей нет" hint="Администратор из .env здесь не показывается" />
           ) : (
-            <table className="ledger w-full min-w-[560px]">
-              <thead>
-                <tr>
-                  <th>Логин</th>
-                  <th>Email</th>
-                  <th>Telegram</th>
-                  <th>Создан</th>
-                  <th className="text-right">
-                    <span className="sr-only">Действия</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <ul className="hand-only px-3">
                 {list.data.map((u) => (
-                  <tr key={u.id}>
-                    <td className="font-semibold">{u.login}</td>
-                    <td className="text-sm">{u.email ?? '—'}</td>
-                    <td className="num text-sm">{u.telegram_user_id ?? '—'}</td>
-                    <td className="num text-sm">{formatDate(u.created_at.slice(0, 10))}</td>
-                    <td className="text-right whitespace-nowrap">
-                      <span className="inline-flex gap-1">
-                        <button className="btn btn-sm" onClick={() => startEdit(u)}>
-                          Изменить
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => setDeleting(u)}>
-                          Удалить
-                        </button>
-                      </span>
-                    </td>
-                  </tr>
+                  <li key={u.id} className="slip">
+                    <div className="slip-row">
+                      <span className="font-semibold min-w-0">{u.login}</span>
+                      <span className="num text-sm">{formatDate(u.created_at.slice(0, 10))}</span>
+                    </div>
+                    <div className="slip-row text-sm">
+                      <span className="min-w-0 break-all">{u.email ?? '—'}</span>
+                      <span className="num">{u.telegram_user_id ?? '—'}</span>
+                    </div>
+                    <div className="slip-row">
+                      <button className="btn" onClick={() => startEdit(u)}>Изменить</button>
+                      <button className="btn" onClick={() => setDeleting(u)}>Удалить</button>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+              <table className="ledger desk-only w-full table-fixed">
+                <thead>
+                  <tr>
+                    <th>Логин</th>
+                    <th>Email</th>
+                    <th>Telegram</th>
+                    <th>Создан</th>
+                    <th className="text-right">
+                      <span className="sr-only">Действия</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.data.map((u) => (
+                    <tr key={u.id}>
+                      <td className="font-semibold">{u.login}</td>
+                      <td className="text-sm break-all">{u.email ?? '—'}</td>
+                      <td className="num text-sm">{u.telegram_user_id ?? '—'}</td>
+                      <td className="num text-sm">{formatDate(u.created_at.slice(0, 10))}</td>
+                      <td className="text-right">
+                        <span className="inline-flex flex-wrap justify-end gap-1">
+                          <button className="btn whitespace-normal" onClick={() => startEdit(u)}>
+                            Изменить
+                          </button>
+                          <button className="btn whitespace-normal" onClick={() => setDeleting(u)}>
+                            Удалить
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
+        </div>
+      </div>
         </div>
       </div>
       <ConfirmDialog

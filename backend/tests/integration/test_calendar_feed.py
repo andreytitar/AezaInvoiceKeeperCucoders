@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from tests.integration.helpers import create_payment, occurrences_of
 
 
@@ -7,8 +9,12 @@ def test_ics_feed(admin, user, anon):
     oid = occurrences_of(admin, p["id"])[0]["id"]
     admin.patch(f"/api/v1/payment-occurrences/{oid}", json={"status": "paid", "paid_date": "2026-10-19"})
     feed = user.get("/api/v1/calendar/feed").json()
-    assert feed["url"].endswith(".ics") and feed["webcal_url"].startswith("webcal://")
-    path = "/" + feed["url"].split("/", 3)[3]
+    base = user.app.state.container.settings.public_base_url.rstrip("/")
+    assert feed["url"].startswith(f"{base}/api/v1/calendar/") and feed["url"].endswith(".ics")
+    assert "testserver" not in feed["url"]
+    http, web = urlsplit(feed["url"]), urlsplit(feed["webcal_url"])
+    assert web.scheme == "webcal" and web.netloc == http.netloc and web.path == http.path
+    path = http.path
     r = anon.get(path)  # календарные приложения ходят без cookie — доступ по секретной ссылке
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/calendar")
     body = r.text

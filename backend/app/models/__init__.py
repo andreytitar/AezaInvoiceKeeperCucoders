@@ -343,16 +343,18 @@ class WebhookEndpoint(TimestampMixin, Base):
 
 
 class TelegramLinkCode(Base):
-    """Одноразовый код привязки: пользователя (deep link /start) или чата для напоминаний (/bind)."""
+    """Одноразовый код: привязка пользователя (/start), чата (/bind), magic-ссылка или вход с сайта (weblogin)."""
 
     __tablename__ = "telegram_link_codes"
 
     code: Mapped[str] = mapped_column(String(64), primary_key=True)
-    purpose: Mapped[str] = mapped_column(String(16))  # user | chat
+    purpose: Mapped[str] = mapped_column(String(16))  # user | chat | magic | weblogin
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Для входа с сайта: telegram id, который бот записал после Start. Пусто, пока пользователь не нажал Start.
+    telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 class TelegramPending(Base):

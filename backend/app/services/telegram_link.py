@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -25,6 +27,12 @@ from app.repositories.users import UserRepository
 from app.services.audit import AuditService
 
 CODE_TTL = timedelta(minutes=15)
+WEB_LOGIN_TTL = timedelta(minutes=10)
+WEB_LOGIN_PREFIX = "weblogin_"
+WEB_LOGIN_PURPOSE = "weblogin"
+WEB_LOGIN_CODE = re.compile(r"^[0-9a-f]{16}$")
+
+log = logging.getLogger("app.telegram.link")
 
 
 @dataclass
@@ -91,6 +99,37 @@ class TelegramLinkService:
     def create_magic(self, user: User, ttl: timedelta) -> TelegramLinkCode:
         return self._new_code("magic", user, ttl)
 
+    def create_web_login(self) -> TelegramLinkCode:
+        """Код для кнопки «Зайти через Telegram». Пользователя ещё нет: его запишет бот после Start."""
+        now = self.clock.now()
+        code = TelegramLinkCode(
+            code=secrets.token_hex(8),
+            purpose=WEB_LOGIN_PURPOSE,
+            user_id=None,
+            telegram_user_id=None,
+            created_at=now,
+            expires_at=now + WEB_LOGIN_TTL,
+        )
+        self.db.add(code)
+        self.db.commit()
+        return code
+
+    def claim_web_login(self, payload: str, telegram_user_id: int) -> None:
+        """Бот принял /start weblogin_<код> и запомнил telegram id. Сайт заберёт код отдельным опросом."""
+        code = payload[len(WEB_LOGIN_PREFIX):] if payload.startswith(WEB_LOGIN_PREFIX) else ""
+        if not WEB_LOGIN_CODE.fullmatch(code):
+            raise ValidationError("Ссылка входа недействительна. На сайте нажмите «Зайти через Telegram» ещё раз.")
+        row = self.db.scalar(select(TelegramLinkCode).where(TelegramLinkCode.code == code).with_for_update())
+        if row is None or row.purpose != WEB_LOGIN_PURPOSE:
+            raise ValidationError("Ссылка входа недействительна. На сайте нажмите «Зайти через Telegram» ещё раз.")
+        if row.used_at is not None or row.telegram_user_id is not None:
+            raise ValidationError("Эта ссылка уже использована. На сайте нажмите «Зайти через Telegram» ещё раз.")
+        if row.expires_at < self.clock.now():
+            raise ValidationError("Срок ссылки истёк. На сайте нажмите «Зайти через Telegram» ещё раз.")
+        row.telegram_user_id = int(telegram_user_id)
+        self.db.commit()
+        log.info("Вход с сайта подтверждён в боте", extra={"telegram_user_id": int(telegram_user_id)})
+
     def _take(self, code: str, purpose: str) -> TelegramLinkCode:
         row = self.db.scalar(
             select(TelegramLinkCode).where(TelegramLinkCode.code == code.strip()).with_for_update()
@@ -119,21 +158,24 @@ class TelegramLinkService:
     def link_user(self, code: str, telegram_user_id: int) -> User:
         """Привязывает Telegram к уже существующему пользователю. Новых учёток не создаёт."""
         row = self._take(code, "user")
-        users = UserRepository(self.db)
-        user = users.get(row.user_id) if row.user_id else None
+        user = UserRepository(self.db).get(row.user_id) if row.user_id else None
         if user is None:
             raise ValidationError("Пользователь для этого кода не найден")
-        other = users.get_by_telegram_id(telegram_user_id)
+        return self.attach_telegram(user, telegram_user_id)
+
+    def attach_telegram(self, user: User, telegram_user_id: int) -> User:
+        """Записывает уже проверенный Telegram id в существующий профиль. Новых учёток не создаёт."""
+        other = UserRepository(self.db).get_by_telegram_id(telegram_user_id)
         if other is not None and other.id != user.id:
             raise Conflict(f"Этот Telegram уже привязан к пользователю {other.login}")
         before = user.telegram_user_id
-        user.telegram_user_id = telegram_user_id
+        user.telegram_user_id = int(telegram_user_id)
         AuditService(self.db, self.clock).log(
             "telegram.user_linked",
             entity_type="user",
             entity_id=user.id,
             before={"telegram_user_id": before},
-            after={"telegram_user_id": telegram_user_id},
+            after={"telegram_user_id": int(telegram_user_id)},
             actor=user,
         )
         self.db.commit()
@@ -154,9 +196,12 @@ class TelegramLinkService:
         users = UserRepository(self.db)
         admin = users.get(row.user_id) if row.user_id else None
         if admin is None or admin.role != Role.ADMIN:
-            raise Forbidden("Привязать группу может только администратор команды")
+            raise Forbidden("Привязать группу может администратор команды. Попросите его выдать код ещё раз.")
         if sender_telegram_id is None or admin.telegram_user_id is None or int(admin.telegram_user_id) != int(sender_telegram_id):
-            raise Forbidden("Привязать группу может только администратор этой команды. Сначала привяжите свой Telegram.")
+            raise Forbidden(
+                "Привязать группу может администратор этой команды. "
+                "Сначала привяжите свой Telegram в панели или через /start."
+            )
         team = admin.team
         teams = TeamRepository(self.db)
         self._reject_foreign_chat(team, int(chat_id), teams)
@@ -190,10 +235,12 @@ class TelegramLinkService:
         if primary is not None and primary.telegram_chat_id is not None:
             primary_ids.add(int(primary.telegram_chat_id))
         if team.kind == TeamKind.SANDBOX and chat_id in primary_ids:
-            raise ValidationError("Песочница не может использовать основной чат напоминаний")
+            raise ValidationError(
+                "Эта временная команда не займёт основной чат напоминаний. Отправьте /bind в отдельной группе."
+            )
         other = teams.get_by_chat_id(chat_id)
         if other is not None and other.id != team.id:
-            raise Conflict("Этот чат уже привязан к другой команде")
+            raise Conflict("Этот чат уже привязан к другой команде. Выберите другую группу.")
 
     def unlink_user(self, user: User) -> None:
         before = user.telegram_user_id

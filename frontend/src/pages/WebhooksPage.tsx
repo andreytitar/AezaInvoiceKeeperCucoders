@@ -21,22 +21,39 @@ function Deliveries({ hook }: { hook: Hook }) {
   if (!list.data) return <Loading />
   if (!list.data.items.length) return <p className="text-sm text-ink-soft py-3">Доставок пока не было.</p>
   return (
-    <table className="ledger w-full text-sm">
-      <thead>
-        <tr><th>Создано</th><th>Событие</th><th>Статус</th><th>Попытки</th><th>Ответ / ошибка</th></tr>
-      </thead>
-      <tbody>
+    <>
+      <ul className="hand-only">
         {list.data.items.map((d) => (
-          <tr key={d.id}>
-            <td className="num text-xs">{timeFmt.format(new Date(d.created_at))}</td>
-            <td className="num text-xs">{d.event}</td>
-            <td className={d.status === 'dead' || d.status === 'failed' ? 'text-red' : d.status === 'sent' ? 'text-green' : ''}>{STATUS[d.status] ?? d.status}</td>
-            <td className="num">{d.attempts}</td>
-            <td className="text-xs break-all">{d.last_error ?? d.response ?? '—'}</td>
-          </tr>
+          <li key={d.id} className="slip">
+            <div className="slip-row">
+              <span>{STATUS[d.status] ?? d.status}</span>
+              <span className="num text-xs">{timeFmt.format(new Date(d.created_at))}</span>
+            </div>
+            <div className="slip-row">
+              <span className="num text-xs break-all min-w-0">{d.event}</span>
+              <span className="num">{d.attempts}</span>
+            </div>
+            <p className="text-xs break-all">{d.last_error ?? d.response ?? '—'}</p>
+          </li>
         ))}
-      </tbody>
-    </table>
+      </ul>
+      <table className="ledger desk-only w-full text-sm">
+        <thead>
+          <tr><th>Создано</th><th>Событие</th><th>Статус</th><th>Попытки</th><th>Ответ / ошибка</th></tr>
+        </thead>
+        <tbody>
+          {list.data.items.map((d) => (
+            <tr key={d.id}>
+              <td className="num text-xs">{timeFmt.format(new Date(d.created_at))}</td>
+              <td className="num text-xs break-all">{d.event}</td>
+              <td>{STATUS[d.status] ?? d.status}</td>
+              <td className="num">{d.attempts}</td>
+              <td className="text-xs break-all">{d.last_error ?? d.response ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }
 
@@ -97,9 +114,9 @@ export function WebhooksPage() {
   return (
     <>
       <PageTitle>Вебхуки</PageTitle>
-      <div className="grid lg:grid-cols-[22rem_1fr] gap-6 items-start">
-        <form onSubmit={create} className="sheet p-5">
-          <h2 className="font-serif text-lg font-bold mb-3">Новый адрес</h2>
+      <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 items-start">
+        <form onSubmit={create} className="sheet p-4 min-w-0">
+          <h2 className="font-sans text-lg font-semibold mb-3">Новый адрес</h2>
           <label className="label" htmlFor="w-url">URL</label>
           <input id="w-url" type="url" required className="field mb-3" placeholder="https://example.com/hook" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
           <fieldset className="mb-3">
@@ -119,7 +136,7 @@ export function WebhooksPage() {
           <input id="w-secret" type="password" autoComplete="new-password" minLength={8} className="field mb-3" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} />
           <label className="label" htmlFor="w-desc">Описание</label>
           <input id="w-desc" className="field mb-4" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          {error && <p className="text-sm text-red mb-3" role="alert">{error}</p>}
+          {error && <p className="text-sm text-ink mb-3" role="alert">{error}</p>}
           <button className="btn btn-primary w-full justify-center" disabled={busy || !form.events.length}>Добавить</button>
           <p className="text-xs text-ink-soft mt-3">
             Подпись: <span className="num">X-InvoiceKeeper-Signature: sha256=HMAC(secret, timestamp + "." + body)</span>. Внутренние адреса запрещены, пока WEBHOOK_ALLOW_PRIVATE=false.
@@ -132,26 +149,24 @@ export function WebhooksPage() {
           ) : !list.data ? (
             <Loading />
           ) : !list.data.length ? (
-            <div className="sheet"><Empty title="Вебхуков нет" hint="Добавьте адрес слева" /></div>
+            <div className="sheet"><Empty title="Вебхуков нет" hint="Добавьте адрес формой выше" /></div>
           ) : (
             list.data.map((h) => (
-              <section key={h.id} className="sheet p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="num text-sm break-all font-semibold">{h.url}</p>
-                    {h.description && <p className="text-sm text-ink-soft">{h.description}</p>}
-                    <p className="text-xs text-ink-soft mt-1 num">
-                      {h.events.join(' · ')} · {h.has_secret ? 'подписывается' : 'без подписи'} · {h.is_active ? 'активен' : 'выключен'}
-                    </p>
-                  </div>
-                  <div className="flex gap-1 flex-wrap">
-                    <button className="btn btn-sm" onClick={() => test(h)}>Тест</button>
-                    <button className="btn btn-sm" onClick={() => toggle(h)}>{h.is_active ? 'Выключить' : 'Включить'}</button>
-                    <button className="btn btn-sm" onClick={() => setOpen(open === h.id ? null : h.id)} aria-expanded={open === h.id}>Журнал</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => setDeleting(h)}>Удалить</button>
-                  </div>
+              <section key={h.id} className="slip">
+                <div className="slip-row">
+                  <p className="num text-sm break-all font-semibold min-w-0">{h.url}</p>
                 </div>
-                {open === h.id && <div className="mt-3 overflow-x-auto"><Deliveries hook={h} /></div>}
+                {h.description && <p className="text-sm text-ink-soft">{h.description}</p>}
+                <p className="text-xs text-ink-soft num break-all">
+                  {h.events.join(' · ')} · {h.has_secret ? 'подписывается' : 'без подписи'} · {h.is_active ? 'активен' : 'выключен'}
+                </p>
+                <div className="slip-row">
+                  <button className="btn" onClick={() => test(h)}>Тест</button>
+                  <button className="btn" onClick={() => toggle(h)}>{h.is_active ? 'Выключить' : 'Включить'}</button>
+                  <button className="btn" onClick={() => setOpen(open === h.id ? null : h.id)} aria-expanded={open === h.id}>Журнал</button>
+                  <button className="btn" onClick={() => setDeleting(h)}>Удалить</button>
+                </div>
+                {open === h.id && <div className="mt-3 min-w-0"><Deliveries hook={h} /></div>}
               </section>
             ))
           )}

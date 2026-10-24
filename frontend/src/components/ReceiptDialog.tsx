@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, unwrap, type Occurrence, type Schemas } from '../api/client'
 import { formatDate } from '../i18n/format'
 import { useToast } from '../store/toast'
+import { dialogActionsCls, dialogBtnCls, dialogCls } from './ui'
 
 type Receipt = Schemas['ReceiptOut']
 const MAX = 5 * 1024 * 1024
@@ -89,10 +90,10 @@ export function ReceiptDialog({ occurrence, onClose, onChanged }: { occurrence: 
   }
 
   return (
-    <dialog ref={ref} onClose={onClose} className="sheet m-auto w-[min(92vw,28rem)] p-0 text-ink backdrop:bg-black/40 shadow-[4px_4px_0_var(--ink)]" aria-labelledby="receipt-title">
+    <dialog ref={ref} onClose={onClose} className={`${dialogCls} win-window`} aria-labelledby="receipt-title">
       {occurrence && (
-        <form className="p-5" onSubmit={save}>
-          <h2 id="receipt-title" className="font-serif text-xl font-bold">Чек к оплате</h2>
+        <form className="p-4" onSubmit={save}>
+          <h2 id="receipt-title" className="font-sans text-xl font-semibold">Чек к оплате</h2>
           <p className="text-sm text-ink-soft mt-1">
             {occurrence.title} · срок {formatDate(occurrence.due_date)}
           </p>
@@ -125,17 +126,13 @@ export function ReceiptDialog({ occurrence, onClose, onChanged }: { occurrence: 
           <input id="r-url" type="url" className="field mb-3" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
           <label className="label" htmlFor="r-file">Файл (PNG, JPG, PDF до 5 МБ)</label>
           <input id="r-file" type="file" accept="image/png,image/jpeg,application/pdf" className="text-sm mb-3 block" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          {error && <p className="text-sm text-red mb-3" role="alert">{error}</p>}
-          <div className="flex justify-between gap-2 mt-2">
+          {error && <p className="text-sm text-ink mb-3" role="alert">{error}</p>}
+          <div className={dialogActionsCls}>
             {receipt ? (
-              <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>Удалить чек</button>
-            ) : (
-              <span />
-            )}
-            <span className="flex gap-2">
-              <button type="button" className="btn" onClick={onClose} disabled={busy}>Закрыть</button>
-              <button className="btn btn-primary" disabled={busy}>{busy ? '…' : 'Сохранить'}</button>
-            </span>
+              <button type="button" className={dialogBtnCls} onClick={remove} disabled={busy}>Удалить чек</button>
+            ) : null}
+            <button type="button" className={dialogBtnCls} onClick={onClose} disabled={busy}>Закрыть</button>
+            <button className={`${dialogBtnCls} btn-primary`} disabled={busy}>{busy ? '…' : 'Сохранить'}</button>
           </div>
         </form>
       )}

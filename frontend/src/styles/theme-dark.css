@@ -1,0 +1,547 @@
+/*
+  Тёмная тема кабинета aéza: серый холст и чёрный рельс, не окно Windows
+  и не синие панели.
+
+  Холст страницы          #141414
+  Рельс и внешний хром    #0a0a0a
+  Карточки и таблицы      #1c1c1c
+  Рамка 1px               #2a2a2a
+  Текст                   #f2f2f2
+  Вторичный текст         #8a8a8a
+  Акцент (кнопки, ссылки) #e97c35
+  Текст на оранжевой      #000000
+  Оплачено                #3dba6a
+  Просрочка — только текст #e97c35
+
+  #4cc6f1 и заливка #182d48 здесь не используются.
+  Заголовки — Exo 2, интерфейс — Inter, суммы .num — IBM Plex Mono.
+*/
+
+html[data-theme="dark"],
+html:root[data-theme="dark"] {
+  --paper: #141414;
+  --paper-2: #1c1c1c;
+  --ink: #f2f2f2;
+  --ink-soft: #8a8a8a;
+  --rule: #2a2a2a;
+  --overdue: #e97c35;
+  --paid: #3dba6a;
+
+  --font-serif: "Exo 2", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  color-scheme: dark;
+  background: #0a0a0a;
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] body {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  font-family: "Inter", sans-serif;
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] .font-serif,
+html[data-theme="dark"] .win-titlebar {
+  font-family: "Exo 2", sans-serif;
+}
+
+html[data-theme="dark"] .num,
+html[data-theme="dark"] .balance-num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+html[data-theme="dark"] .label {
+  font-family: "Inter", sans-serif;
+  color: #8a8a8a;
+}
+
+html[data-theme="dark"] input[type="checkbox"],
+html[data-theme="dark"] input[type="radio"] {
+  accent-color: #e97c35;
+}
+
+/* Ссылки контента — акцент. Рельс, шапка и кнопки-ссылки остаются светлыми. */
+html[data-theme="dark"] :where(a) {
+  color: #e97c35;
+}
+
+html[data-theme="dark"] .shell-rail a,
+html[data-theme="dark"] .shell-brand a,
+html[data-theme="dark"] nav.shell-tabs a,
+html[data-theme="dark"] .win-titlebar a,
+html[data-theme="dark"] footer a,
+html[data-theme="dark"] a.btn {
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] a.btn-primary {
+  color: #000000;
+}
+
+html[data-theme="dark"] :focus-visible,
+html[data-theme="dark"] .field:focus,
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  outline: 2px solid #e97c35;
+  outline-offset: 2px;
+}
+
+/* Внешний хром. Холст — отдельно, на main. */
+html[data-theme="dark"] .h-dvh.bg-paper,
+html[data-theme="dark"] .shell-root.h-dvh,
+html[data-theme="dark"] .shell-root > .shell-frame {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] main,
+html[data-theme="dark"] main.shell-canvas {
+  background: #141414;
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] aside,
+html[data-theme="dark"] aside.shell-rail {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  border-right-color: #2a2a2a;
+}
+
+html[data-theme="dark"] header.shell-mobile-head,
+html[data-theme="dark"] nav.shell-tabs.bg-paper,
+html[data-theme="dark"] .shell-foot > footer.bg-paper,
+html[data-theme="dark"] footer {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  border-color: #2a2a2a;
+}
+
+@media (max-width: 719px) {
+  html[data-theme="dark"] .shell-canvas .win-window {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  html[data-theme="dark"] .shell-canvas .win-window > .win-titlebar {
+    display: none;
+  }
+
+  html[data-theme="dark"] .summary-cards .summary-card {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  html[data-theme="dark"] .payments-list-sheet {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  html[data-theme="dark"] .page-title {
+    border-bottom-color: #2a2a2a;
+    border-bottom-width: 1px;
+    border-style: solid;
+  }
+
+  html[data-theme="dark"] header.shell-mobile-head {
+    border-bottom-color: #2a2a2a;
+  }
+}
+
+html[data-theme="dark"] aside.shell-rail a.shell-link,
+html[data-theme="dark"] .shell-brand a.font-serif {
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] .shell-rail .shell-meta {
+  color: #8a8a8a;
+}
+
+/* Карточка вместо рамки Windows. Без фаски, тени и цветной плашки. */
+html[data-theme="dark"] .win-window {
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  box-shadow: none;
+  background-image: none;
+}
+
+html[data-theme="dark"] .win-window:not(dialog) {
+  overflow: hidden;
+}
+
+html[data-theme="dark"] .shell-frame.win-window {
+  background: #0a0a0a;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+html[data-theme="dark"] .win-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+  padding: 16px 16px 4px;
+  background: transparent;
+  color: #f2f2f2;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background-image: none;
+  font-family: "Exo 2", sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+html[data-theme="dark"] .win-titlebar::before,
+html[data-theme="dark"] .win-titlebar::after {
+  content: none;
+  display: none;
+  width: 0;
+  height: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .sheet,
+html[data-theme="dark"] .balance {
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .balance-col + .balance-col {
+  border-left-color: #2a2a2a;
+}
+
+html[data-theme="dark"] .ledger {
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+/* Блоки Upcoming: одна рамка у таблицы, без линии под заголовком (в светлой теме линия h2 остаётся). */
+html[data-theme="dark"] .upcoming-section__title {
+  border-bottom-width: 0;
+  padding-bottom: 0;
+  margin-bottom: 0.5rem;
+}
+
+html[data-theme="dark"] .sheet .ledger,
+html[data-theme="dark"] .win-window .sheet .ledger {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+html[data-theme="dark"] .ledger th {
+  color: #8a8a8a;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+html[data-theme="dark"] .ledger td,
+html[data-theme="dark"] .slip {
+  border-bottom-color: #2a2a2a;
+}
+
+html[data-theme="dark"] .shell-canvas .border-ink {
+  border-color: #2a2a2a;
+}
+
+html[data-theme="dark"] .sum-line,
+html[data-theme="dark"] .border-double {
+  border-color: #2a2a2a;
+  border-style: solid;
+  border-bottom-width: 1px;
+}
+
+html[data-theme="dark"] .border-double {
+  border-bottom-width: 1px;
+}
+
+html[data-theme="dark"] .shell-canvas [aria-selected="true"].border-ink {
+  border-color: #e97c35;
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] .btn,
+html[data-theme="dark"] .win-btn,
+html[data-theme="dark"] .btn-ghost {
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  box-shadow: none;
+  text-shadow: none;
+  background-image: none;
+  font-family: "Inter", sans-serif;
+}
+
+html[data-theme="dark"] .btn:hover,
+html[data-theme="dark"] .btn:active,
+html[data-theme="dark"] .win-btn:hover,
+html[data-theme="dark"] .win-btn:active,
+html[data-theme="dark"] .btn-ghost:hover,
+html[data-theme="dark"] .btn-ghost:active {
+  background: #242424;
+  color: #f2f2f2;
+  border-color: #2a2a2a;
+  box-shadow: none;
+  text-shadow: none;
+  background-image: none;
+  filter: none;
+}
+
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .btn-primary.win-btn,
+html[data-theme="dark"] a.btn-primary {
+  background: #e97c35;
+  color: #000000;
+  border-color: #e97c35;
+  border-radius: 8px;
+}
+
+html[data-theme="dark"] .btn-primary:hover,
+html[data-theme="dark"] .btn-primary:active,
+html[data-theme="dark"] a.btn-primary:hover,
+html[data-theme="dark"] a.btn-primary:active {
+  background: #f08a45;
+  color: #000000;
+  border-color: #f08a45;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-theme="dark"] .btn:disabled,
+html[data-theme="dark"] .win-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+html[data-theme="dark"] .btn:focus-visible,
+html[data-theme="dark"] .win-btn:focus-visible {
+  outline: 2px solid #e97c35;
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] .btn-danger {
+  background: #1c1c1c;
+  color: #c46b62;
+  border-color: #6e3d38;
+}
+
+html[data-theme="dark"] .btn-danger:hover,
+html[data-theme="dark"] .btn-danger:active {
+  background: #241c1c;
+  color: #c46b62;
+  border-color: #6e3d38;
+  box-shadow: none;
+}
+
+/* Рельс: те же вторичные кнопки, поверх локальных правил оболочки. */
+html[data-theme="dark"] aside.shell-rail .shell-quiet.btn,
+html[data-theme="dark"] aside.shell-rail .shell-cta.btn {
+  justify-content: center;
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  box-shadow: none;
+  text-shadow: none;
+  background-image: none;
+  filter: none;
+}
+
+html[data-theme="dark"] aside.shell-rail .shell-quiet.btn:hover,
+html[data-theme="dark"] aside.shell-rail .shell-quiet.btn:active,
+html[data-theme="dark"] aside.shell-rail .shell-cta.btn:hover,
+html[data-theme="dark"] aside.shell-rail .shell-cta.btn:active {
+  background: #242424;
+  color: #f2f2f2;
+  border-color: #2a2a2a;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .field {
+  background: #141414;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  box-shadow: none;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .field:focus,
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  border-color: #e97c35;
+  outline-offset: 0;
+}
+
+html[data-theme="dark"] ::placeholder {
+  color: #8a8a8a;
+  opacity: 1;
+}
+
+html[data-theme="dark"] option {
+  background: #141414;
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] .text-overdue,
+html[data-theme="dark"] .overdue-ink,
+html[data-theme="dark"] [title="Не оплачено, срок прошёл"] {
+  color: #e97c35;
+}
+
+html[data-theme="dark"] .text-paid,
+html[data-theme="dark"] .stamp {
+  color: #3dba6a;
+  border-color: #3dba6a;
+  background: transparent;
+}
+
+html[data-theme="dark"] dialog {
+  background: #1c1c1c;
+  color: #f2f2f2;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+html[data-theme="dark"] dialog#more-sheet {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  border-color: #2a2a2a;
+  border-radius: 12px 12px 0 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] dialog#more-sheet .win-btn.shell-more-item {
+  justify-content: flex-start;
+  background: transparent;
+  color: #f2f2f2;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background-image: none;
+}
+
+html[data-theme="dark"] dialog#more-sheet .win-btn.shell-more-item:not(.border-0) {
+  border-bottom: 1px solid #2a2a2a;
+}
+
+html[data-theme="dark"] .bg-ink.text-paper-2 {
+  background: #e97c35;
+  color: #000000;
+  border-color: #e97c35;
+}
+
+html[data-theme="dark"] .bg-ink\/40 {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+/* Календарь: ступени серого. Просрочка не заливает клетку. */
+html[data-theme="dark"] [data-cal-grid] {
+  background: #1c1c1c;
+  border-color: #2a2a2a;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone] {
+  color: #f2f2f2;
+  border-color: #2a2a2a;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="d3"] {
+  background: #1c1c1c;
+  color: #8a8a8a;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="d2"] {
+  background: #222222;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="d1"] {
+  background: #2a2a2a;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="pay"] {
+  background: #303030;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="overdue"] {
+  background: #1c1c1c;
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone] .text-paper,
+html[data-theme="dark"] [data-cal-grid] [data-tone] .text-ink,
+html[data-theme="dark"] [data-cal-grid] [data-tone] .text-ink-soft {
+  color: #f2f2f2;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone="d3"] .text-ink-soft {
+  color: #8a8a8a;
+}
+
+html[data-theme="dark"] [data-cal-grid] [data-tone] .text-overdue {
+  color: #e97c35;
+}
+
+html[data-theme="dark"] [data-cal-grid] .bg-ink.text-paper {
+  background: #f2f2f2;
+  color: #141414;
+}
+
+html:root[data-theme="dark"] .cal-d3 { background: #1c1c1c; }
+html:root[data-theme="dark"] .cal-d2 { background: #222222; }
+html:root[data-theme="dark"] .cal-d1 { background: #2a2a2a; }
+html:root[data-theme="dark"] .cal-pay { background: #303030; }
+
+html:root[data-theme="dark"] .cal-overdue {
+  background: #1c1c1c;
+  color: #f2f2f2;
+}
+
+html:root[data-theme="dark"] .cal-overdue .text-ink-soft {
+  color: #f2f2f2;
+}
+
+html:root[data-theme="dark"] .cal-overdue .text-overdue {
+  color: #e97c35;
+}

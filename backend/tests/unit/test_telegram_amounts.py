@@ -13,7 +13,7 @@ from app.domain.money import NBSP, Currency, format_amount
 from app.infrastructure.channels.base import Notification
 from app.infrastructure.channels.chat_webhook import render
 from app.infrastructure.channels.formatting import plain_text, telegram_html
-from app.services.bot_answers import BotAnswers, _money, _totals
+from app.services.bot_answers import BotAnswers, _money, _totals, format_occurrence_card
 
 GROUPED_ON_REGULAR_SPACE = re.compile(r"\d \d")
 
@@ -82,10 +82,11 @@ def test_bot_list_line_does_not_split_amount_or_date():
         amount_snapshot=Decimal("55000"),
         currency_snapshot=Currency.RUB,
     )
-    line = answers._line(item)
+    line = format_occurrence_card(item, date(2026, 10, 24))
     amount = format_amount(item.amount_snapshot, item.currency_snapshot)
-    _assert_atomic(line, amount)
-    assert "28.10" in _tokens(line)
+    glued = f"{amount}{NBSP}({item.currency_snapshot.value})"
+    _assert_atomic(line, glued)
+    assert "28.10.2026" in _visible(line)
     assert _money(item) == amount
 
 

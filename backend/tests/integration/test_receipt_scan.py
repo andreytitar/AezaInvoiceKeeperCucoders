@@ -102,7 +102,9 @@ def test_bot_photo_in_private(admin, user, regular_user, container):
     update = {"update_id": 1, "message": {"message_id": 7, "chat": {"id": 555, "type": "private"}, "from": {"id": 555},
                                           "photo": [{"file_id": "small"}, {"file_id": "big"}]}}
     asyncio.run(TelegramUpdateHandler(container, client).handle_update(update))
-    assert "Оплата отмечена" in client.messages[0]["text"] and client.messages[0]["reply_to"] == 7
+    assert len(client.messages) >= 2
+    assert "распознаю" in client.messages[0]["text"].lower()
+    assert "Оплата отмечена" in client.messages[-1]["text"] and client.messages[-1]["reply_to"] == 7
     occ = occurrences_of(admin, p["id"])[0]
     assert occ["status"] == "paid" and occ["paid_date"] == "2026-10-20"
     log = admin.get("/api/v1/audit-logs", params={"action": "occurrence.paid"}).json()["items"][0]
@@ -112,4 +114,4 @@ def test_bot_photo_in_private(admin, user, regular_user, container):
     update["message"]["from"]["id"] = 999
     update["message"]["chat"]["id"] = 999
     asyncio.run(TelegramUpdateHandler(container, stranger).handle_update(update))
-    assert "привяжите Telegram" in stranger.messages[0]["text"]
+    assert "привязк" in stranger.messages[0]["text"].lower()

@@ -13,12 +13,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-[min(24rem,calc(100vw-2rem))]" role="status" aria-live="polite">
         {items.map((t) => (
-          <div
-            key={t.id}
-            className={`fade-in sheet px-4 py-3 text-sm shadow-[3px_3px_0_var(--ink)] ${t.kind === 'error' ? 'border-red text-red' : ''}`}
-          >
+          <div key={t.id} className="fade-in sheet px-4 py-3 text-sm">
             {t.text}
           </div>
         ))}

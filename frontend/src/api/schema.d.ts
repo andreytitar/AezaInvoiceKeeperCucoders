@@ -95,6 +95,203 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/telegram/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Настроена ли кнопка входа через Telegram
+         * @description Если имя бота в настройках пустое, а токен задан, имя запрашивается у Telegram (getMe) и кэшируется.
+         */
+        get: operations["telegram_config_api_v1_auth_telegram_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/deeplink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ссылка t.me для входа через бота
+         * @description Создаёт одноразовый код на 10 минут и кладёт его в HttpOnly-cookie. Ссылка открывает бота с /start weblogin_<код>. Домен и HTTPS не нужны.
+         */
+        post: operations["telegram_deeplink_api_v1_auth_telegram_deeplink_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/deeplink/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Опрос подтверждения входа через бота
+         * @description Пока пользователь не нажал Start, статус waiting. После Start — та же развилка, что у /start: привязанный Telegram получает HttpOnly-сессию, непривязанный — экран выбора на сайте.
+         */
+        post: operations["telegram_deeplink_status_api_v1_auth_telegram_deeplink_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Есть ли незавершённый вход через Telegram
+         * @description После виджета, если аккаунт ещё не привязан, браузер хранит HttpOnly-cookie. Сессии панели при этом нет.
+         */
+        get: operations["telegram_pending_api_v1_auth_telegram_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Вход по Telegram Login Widget
+         * @description Проверяет hash виджета (HMAC-SHA256, секрет — SHA256 токена бота) и отвергает auth_date старше суток. Привязанный Telegram открывает сессию этого пользователя. Непривязанный получает статус unlinked и может создать временную команду, ввести код приглашения или привязать существующий логин.
+         */
+        post: operations["telegram_login_api_v1_auth_telegram_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Забыть незавершённый вход через Telegram */
+        post: operations["telegram_cancel_api_v1_auth_telegram_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/sandbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Создать временную команду и войти её администратором
+         * @description Тот же TeamService, что и кнопка бота «Создать временную команду»: администратор, сотрудник, демо-платежи, 24 часа.
+         */
+        post: operations["telegram_sandbox_api_v1_auth_telegram_sandbox_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Войти по коду приглашения временной команды
+         * @description Те же правила, что у /join в боте: код песочницы, срок, один Telegram — одна команда. Роль нового участника — user.
+         */
+        post: operations["telegram_join_api_v1_auth_telegram_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Привязать Telegram к уже существующему логину
+         * @description Пароль проверяется как при обычном входе, затем Telegram id из виджета записывается в этот профиль. Новый администратор основной команды не создаётся.
+         */
+        post: operations["telegram_link_account_api_v1_auth_telegram_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sandbox/employee": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Зайти как сотрудник временной команды
+         * @description Сменяет сессию администратора песочницы на заранее созданного сотрудника той же команды.
+         */
+        post: operations["sandbox_employee_api_v1_auth_sandbox_employee_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -957,6 +1154,11 @@ export interface components {
             /** Fake Today */
             fake_today: boolean;
         };
+        /** InviteCodeRequest */
+        InviteCodeRequest: {
+            /** Code */
+            code: string;
+        };
         /** LinkCode */
         LinkCode: {
             /** Code */
@@ -1014,6 +1216,11 @@ export interface components {
             /** Is System */
             is_system: boolean;
             team: components["schemas"]["TeamOut"];
+            /**
+             * Invite Code
+             * @description Код приглашения временной команды. Виден только её администратору.
+             */
+            invite_code?: string | null;
         };
         /** MoneyBucket */
         MoneyBucket: {
@@ -1287,6 +1494,51 @@ export interface components {
             /** Chat Title */
             chat_title: string | null;
         };
+        /** TelegramDeepLinkOut */
+        TelegramDeepLinkOut: {
+            /** Code */
+            code: string;
+            /** Url */
+            url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** TelegramLoginConfig */
+        TelegramLoginConfig: {
+            /** Enabled */
+            enabled: boolean;
+            /** Bot Username */
+            bot_username?: string | null;
+            /**
+             * Token Configured
+             * @default false
+             */
+            token_configured: boolean;
+        };
+        /** TelegramLoginResponse */
+        TelegramLoginResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "authenticated" | "unlinked" | "waiting";
+            /** Access Token */
+            access_token?: string | null;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            user?: components["schemas"]["MeOut"] | null;
+        };
+        /** TelegramPendingOut */
+        TelegramPendingOut: {
+            /** Pending */
+            pending: boolean;
+        };
         /** TelegramStatus */
         TelegramStatus: {
             /** Enabled */
@@ -1303,6 +1555,31 @@ export interface components {
             chat_source: string;
             /** Me Linked */
             me_linked: boolean;
+        };
+        /**
+         * TelegramWidgetAuth
+         * @description Поля Telegram Login Widget. Лишние ключи сохраняются: они входят в подпись.
+         */
+        TelegramWidgetAuth: {
+            /**
+             * Id
+             * @description Telegram user id из виджета, не ввод с клавиатуры
+             */
+            id: number;
+            /** Auth Date */
+            auth_date: number;
+            /** Hash */
+            hash: string;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Username */
+            username?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -1684,6 +1961,383 @@ export interface operations {
             };
             /** @description Ошибка валидации */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_config_api_v1_auth_telegram_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginConfig"];
+                };
+            };
+        };
+    };
+    telegram_deeplink_api_v1_auth_telegram_deeplink_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramDeepLinkOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_deeplink_status_api_v1_auth_telegram_deeplink_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_pending_api_v1_auth_telegram_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramPendingOut"];
+                };
+            };
+        };
+    };
+    telegram_login_api_v1_auth_telegram_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramWidgetAuth"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_cancel_api_v1_auth_telegram_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telegram_sandbox_api_v1_auth_telegram_sandbox_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Слишком много временных команд */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telegram_join_api_v1_auth_telegram_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_link_account_api_v1_auth_telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Слишком много попыток */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sandbox_employee_api_v1_auth_sandbox_employee_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

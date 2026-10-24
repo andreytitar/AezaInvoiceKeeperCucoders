@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 import time
 from datetime import datetime
 
@@ -13,24 +15,46 @@ from app.services.telegram_link import TelegramLinkService, get_bound_chat
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
 
-_bot_cache: dict[str, tuple[float, str | None]] = {}
+log = logging.getLogger("app.telegram")
+_bot_cache: dict[str, tuple[float, str]] = {}
+_USERNAME_RE = re.compile(r"[A-Za-z0-9_]{5,32}")
+
+
+def normalize_bot_username(value: str | None) -> str | None:
+    raw = (value or "").strip().lstrip("@")
+    if _USERNAME_RE.fullmatch(raw):
+        return raw
+    return None
 
 
 async def bot_username(c) -> str | None:
-    """Имя бота для ссылки t.me/<бот>?start=… (getMe, кэш на 10 минут)."""
+    """Имя бота для ссылки t.me/<бот>?start=… (getMe). Успех кэшируется на 10 минут, ошибка — нет."""
     s = c.settings
     if not s.telegram_enabled:
         return None
-    cached = _bot_cache.get(s.telegram_bot_token or "")
+    token = s.telegram_bot_token or ""
+    cached = _bot_cache.get(token)
     if cached and time.monotonic() - cached[0] < 600:
         return cached[1]
     try:
-        me = await TelegramClient(s.telegram_bot_token or "", s.telegram_api_base, timeout=5).get_me()
-        name = me.get("username")
+        me = await TelegramClient(token, s.telegram_api_base, timeout=5).get_me()
+        name = normalize_bot_username(me.get("username") if isinstance(me, dict) else None)
     except TelegramError:
-        name = None
-    _bot_cache[s.telegram_bot_token or ""] = (time.monotonic(), name)
+        log.warning("getMe не вернул имя бота")
+        return None
+    if not name:
+        log.warning("getMe не вернул имя бота")
+        return None
+    _bot_cache[token] = (time.monotonic(), name)
     return name
+
+
+async def login_bot_username(c) -> str | None:
+    """Имя для кнопки входа: из настроек, а если его нет — через getMe по токену."""
+    configured = normalize_bot_username(c.settings.telegram_login_bot)
+    if configured:
+        return configured
+    return await bot_username(c)
 
 
 class TelegramStatus(BaseModel):

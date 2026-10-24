@@ -75,6 +75,9 @@ class TelegramClient:
             "answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert}
         )
 
+    async def send_chat_action(self, chat_id: str | int, action: str = "typing") -> Any:
+        return await self.call("sendChatAction", {"chat_id": chat_id, "action": action})
+
     async def get_me(self) -> dict:
         return await self.call("getMe", {})
 
@@ -82,6 +85,12 @@ class TelegramClient:
         return await self.call(
             "setMyCommands", {"commands": [{"command": c, "description": d} for c, d in commands]}
         )
+
+    async def set_my_description(self, description: str) -> Any:
+        return await self.call("setMyDescription", {"description": description})
+
+    async def set_my_short_description(self, short_description: str) -> Any:
+        return await self.call("setMyShortDescription", {"short_description": short_description})
 
     async def get_file(self, file_id: str) -> dict:
         return await self.call("getFile", {"file_id": file_id})
