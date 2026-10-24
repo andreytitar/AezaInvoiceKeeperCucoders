@@ -1554,6 +1554,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/send-digest:
+    post:
+      tags:
+      - admin
+      summary: Отправить недельную сводку в чат прямо сейчас (admin)
+      operationId: send_digest_now_api_v1_admin_send_digest_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigestResult'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
   /api/v1/admin/run-checks:
     post:
       tags:
@@ -2048,6 +2075,9 @@ components:
         cancelled:
           type: integer
           title: Cancelled
+        digest_sent:
+          type: boolean
+          title: Digest Sent
       type: object
       required:
       - periods_created
@@ -2057,6 +2087,7 @@ components:
       - failed
       - dead
       - cancelled
+      - digest_sent
       title: CheckResult
     Currency:
       type: string
@@ -2100,6 +2131,15 @@ components:
       - dead
       - cancelled
       title: DeliveryStatus
+    DigestResult:
+      properties:
+        sent:
+          type: boolean
+          title: Sent
+      type: object
+      required:
+      - sent
+      title: DigestResult
     ErrorBody:
       properties:
         code:

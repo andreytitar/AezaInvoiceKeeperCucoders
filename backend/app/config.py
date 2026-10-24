@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     # --- Напоминания ---
     reminder_days_before: int = Field(default=3, ge=3, le=60)
     worker_interval_seconds: int = Field(default=60, ge=1)
+    digest_weekday: int = Field(default=0, ge=-1, le=6)  # 0 — понедельник, -1 — сводка выключена
+    digest_hour: int = Field(default=9, ge=0, le=23)
     overdue_remind_every_days: int = Field(default=3, ge=0, le=60)  # 0 — повторы о просрочке выключены
     overdue_remind_max: int = Field(default=5, ge=0, le=50)
     delivery_max_attempts: int = 5

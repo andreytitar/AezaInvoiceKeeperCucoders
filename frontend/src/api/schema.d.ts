@@ -438,6 +438,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/send-digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Отправить недельную сводку в чат прямо сейчас (admin) */
+        post: operations["send_digest_now_api_v1_admin_send_digest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/run-checks": {
         parameters: {
             query?: never;
@@ -744,6 +761,8 @@ export interface components {
             dead: number;
             /** Cancelled */
             cancelled: number;
+            /** Digest Sent */
+            digest_sent: boolean;
         };
         /**
          * Currency
@@ -766,6 +785,11 @@ export interface components {
          * @enum {string}
          */
         DeliveryStatus: "pending" | "sending" | "sent" | "failed" | "dead" | "cancelled";
+        /** DigestResult */
+        DigestResult: {
+            /** Sent */
+            sent: boolean;
+        };
         /** ErrorBody */
         ErrorBody: {
             /** Code */
@@ -2915,6 +2939,44 @@ export interface operations {
             };
             /** @description Ошибка валидации */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_digest_now_api_v1_admin_send_digest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DigestResult"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

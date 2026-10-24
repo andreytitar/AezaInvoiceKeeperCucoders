@@ -111,13 +111,27 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
             {isAdmin && (
               <section className="mt-4 border-t border-rule pt-3">
                 <h3 className="font-semibold">Чат для напоминаний</h3>
+                <p className="text-xs text-ink-soft">Сюда приходят напоминания и сводка по понедельникам в 9:00.</p>
                 <p className="text-sm mt-1">
                   {status.chat_bound
                     ? <>Сейчас: <b>{status.chat_title ?? 'чат из .env'}</b>{status.chat_source === 'env' && ' (TELEGRAM_CHAT_ID)'}.</>
                     : 'Чат не подключён — напоминаниям некуда приходить.'}
                 </p>
                 {!chatCode ? (
-                  <button className="btn btn-sm mt-2" onClick={bindChat}>{status.chat_bound ? 'Подключить другой чат' : 'Подключить чат'}</button>
+                  <span className="flex flex-wrap gap-2 mt-2">
+                    <button className="btn btn-sm" onClick={bindChat}>{status.chat_bound ? 'Подключить другой чат' : 'Подключить чат'}</button>
+                    {status.chat_bound && (
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={async () => {
+                          const r = await api.POST('/api/v1/admin/send-digest')
+                          toast(r.data?.sent ? 'ok' : 'error', r.data?.sent ? 'Сводка отправлена в чат' : 'Сводку отправить не удалось')
+                        }}
+                      >
+                        Отправить сводку сейчас
+                      </button>
+                    )}
+                  </span>
                 ) : (
                   <>
                     <p className="text-sm mt-2">Добавьте бота в группу и отправьте там (код действует 15 минут):</p>

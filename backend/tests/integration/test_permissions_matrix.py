@@ -37,6 +37,7 @@ MATRIX = [
     ("GET", f"/api/v1/webhooks/{RID}/deliveries", None, False),
     ("POST", f"/api/v1/webhooks/{RID}/test", None, False),
     ("POST", "/api/v1/admin/run-checks", None, False),
+    ("POST", "/api/v1/admin/send-digest", None, False),
     ("GET", "/api/v1/telegram/status", None, True),
     ("POST", "/api/v1/telegram/link", None, True),
     ("DELETE", "/api/v1/telegram/link", None, True),
