@@ -9,7 +9,7 @@ export function loadTheme(): Theme {
   } catch {
     /* хранилище недоступно */
   }
-  return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 export function applyTheme(t: Theme) {

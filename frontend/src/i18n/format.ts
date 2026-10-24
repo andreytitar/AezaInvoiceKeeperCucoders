@@ -9,7 +9,7 @@ export function formatMoney(amount: string | number, currency: string): string {
   return f.format(Number(amount))
 }
 
-const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
+const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 const dateFmtShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' })
 const monthFmt = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' })
 

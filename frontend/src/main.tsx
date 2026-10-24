@@ -2,11 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import './styles/theme-light.css'
-import './styles/theme-dark.css'
-import { applyTheme, loadTheme } from './theme/theme'
+import { loadTheme } from './theme/theme'
 
-applyTheme(loadTheme())
+document.documentElement.dataset.theme = loadTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
