@@ -5,6 +5,12 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    proxy: { '/api': 'http://localhost:8000' },
+    proxy: {
+      '/api': {
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:8000',
+        // Preserve the browser host so cookie-based CSRF checks work with HMR.
+        changeOrigin: false,
+      },
+    },
   },
 })
