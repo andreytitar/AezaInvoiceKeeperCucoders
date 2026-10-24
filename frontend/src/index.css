@@ -745,7 +745,7 @@
 }
 .payment-filters-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 1.6fr) 100px 136px 124px 124px auto;
+  grid-template-columns: minmax(140px, 1.6fr) 144px 136px 124px 124px auto;
   gap: 12px;
   align-items: end;
 }
@@ -795,6 +795,13 @@
   .shell-link {
     font-size: 13px;
     gap: 10px;
+  }
+  .payment-filters-grid {
+    grid-template-columns: minmax(180px, 1fr) 144px 136px 124px 124px;
+  }
+  .payment-filters-grid > :last-child {
+    justify-self: start;
+    padding-inline: 0;
   }
 }
 @media (max-width: 1099px) {
