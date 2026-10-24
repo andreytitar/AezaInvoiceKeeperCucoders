@@ -4,7 +4,7 @@ import { toISODate } from '../i18n/format'
 
 /** «Сегодня» по серверу (APP_TIMEZONE и APP_FAKE_TODAY), а не по часам браузера. */
 export function useServerToday() {
-  const [today, setToday] = useState<string>(toISODate(new Date()))
+  const [today, setToday] = useState<string>(() => toISODate(new Date()))
   const [fake, setFake] = useState(false)
   useEffect(() => {
     api.GET('/api/v1/health').then((r) => {

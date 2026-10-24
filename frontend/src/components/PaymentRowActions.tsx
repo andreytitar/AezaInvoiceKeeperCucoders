@@ -1,81 +1,57 @@
 import type { Occurrence } from '../api/client'
-
-type Placement = 'slip' | 'table'
+import { Icon } from './Icon'
+import { Button, Menu, MenuItem } from './ui'
 
 type Props = {
   occurrence: Occurrence
   busy: boolean
-  placement: Placement
+  placement: 'slip' | 'table'
   onPaidToday: () => void
   onPickDate: () => void
   onReceipt: () => void
   onUnpay: () => void
 }
 
-/** Кнопки строки: одна высота (.btn), на широком экране «Чек / Оплачено / Указать дату оплаты» в одну линию. */
+/** Одно основное действие, остальные — в доступном с клавиатуры меню. */
 export function PaymentRowActions({ occurrence, busy, placement, onPaidToday, onPickDate, onReceipt, onUnpay }: Props) {
-  const btn = (primary = false) =>
-    `btn ${placement === 'slip' ? 'max-w-full flex-1' : 'shrink-0'} ${primary ? 'btn-primary' : ''}`
-
-  const dateLabel = placement === 'slip' ? 'Дата оплаты' : 'Указать дату оплаты'
-  const dateAria =
-    occurrence.status === 'unpaid'
-      ? `Указать дату оплаты для «${occurrence.title}»`
-      : `Изменить дату оплаты для «${occurrence.title}»`
-
-  const receipt = (
-    <button type="button" className={btn()} onClick={onReceipt} aria-label={`Чек для «${occurrence.title}»`}>
-      {placement === 'slip' && occurrence.has_receipt ? 'Чек есть' : 'Чек'}
-    </button>
-  )
-  const actions =
-    occurrence.status === 'unpaid' ? (
-      <>
-        <button
-          type="button"
-          className={btn(true)}
-          onClick={onPaidToday}
-          disabled={busy}
-          title={placement === 'table' ? 'Отметить оплату сегодняшней датой' : undefined}
-        >
-          Оплачено
-        </button>
-        <button type="button" className={btn()} onClick={onPickDate} disabled={busy} aria-label={dateAria}>
-          {dateLabel}
-        </button>
-      </>
-    ) : (
-      <>
-        <button type="button" className={btn()} onClick={onPickDate} disabled={busy} aria-label={dateAria}>
-          {dateLabel}
-        </button>
-        <button type="button" className={btn()} onClick={onUnpay} disabled={busy}>
-          Отменить оплату
-        </button>
-      </>
-    )
-
+  const unpaid = occurrence.status === 'unpaid'
   return (
     <div
-      className={
-        placement === 'slip'
-          ? 'flex w-full flex-wrap items-stretch gap-1'
-          : 'inline-flex max-w-full flex-nowrap items-stretch justify-end gap-1'
-      }
+      className={`flex items-center gap-2 ${placement === 'table' ? 'justify-end' : 'justify-between'}`}
       role="group"
       aria-label={`Действия для «${occurrence.title}»`}
     >
-      {placement === 'table' ? (
-        <>
-          {receipt}
-          {actions}
-        </>
-      ) : (
-        <>
-          {actions}
-          {receipt}
-        </>
-      )}
+      {unpaid ? (
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={busy}
+          onClick={onPaidToday}
+          aria-label={`Отметить «${occurrence.title}» оплаченным сегодня`}
+          title="Отметить оплату сегодняшней датой"
+        >
+          <Icon name="check" />
+          Оплачено
+        </Button>
+      ) : placement === 'slip' ? (
+        <span className="text-xs text-ink-soft">{occurrence.has_receipt ? 'Чек прикреплён' : 'Платёж оплачен'}</span>
+      ) : null}
+      <Menu label={`Действия для «${occurrence.title}»`}>
+        <MenuItem onClick={onPickDate} disabled={busy}>
+          <Icon name="calendar" />
+          {unpaid ? 'Указать дату оплаты' : 'Изменить дату оплаты'}
+        </MenuItem>
+        <MenuItem onClick={onReceipt} disabled={busy}>
+          <Icon name="receipt" />
+          {occurrence.has_receipt ? 'Открыть чек' : 'Прикрепить чек'}
+        </MenuItem>
+        {!unpaid && (
+          <MenuItem onClick={onUnpay} disabled={busy} danger>
+            <Icon name="close" />
+            Отменить оплату
+          </MenuItem>
+        )}
+      </Menu>
     </div>
   )
 }

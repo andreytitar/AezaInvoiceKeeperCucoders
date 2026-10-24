@@ -48,7 +48,7 @@ export function TelegramLoginWidget({
     script.setAttribute('data-telegram-login', botUsername)
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-radius', '2')
+    script.setAttribute('data-radius', '8')
     script.setAttribute('data-lang', 'ru')
     script.setAttribute('data-onauth', 'invoiceKeeperTelegramAuth(user)')
     node.replaceChildren(script)

@@ -1,6 +1,24 @@
 import { useState, type FormEvent } from 'react'
 import { api, unwrap, type RecurringPayment } from '../api/client'
-import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  ConfirmDialog,
+  DateInput,
+  Dialog,
+  EmptyState,
+  ErrorNote,
+  Input,
+  Loading,
+  Menu,
+  MenuItem,
+  PageTitle,
+  Select,
+  Table,
+} from '../components/ui'
+import { Icon } from '../components/Icon'
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
 import { CURRENCIES, RECURRENCE_NAMES, formatDate, formatMoney } from '../i18n/format'
@@ -23,14 +41,23 @@ export function RecurringPaymentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<RecurringPayment | null>(null)
   const [editing, setEditing] = useState<RecurringPayment | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
 
   const startEdit = (p: RecurringPayment) => {
     setEditing(p)
+    setFormOpen(true)
     setError(null)
-    setForm({ title: p.title, amount: p.amount, currency: p.currency, first_due_date: p.first_due_date, recurrence: p.recurrence })
+    setForm({
+      title: p.title,
+      amount: p.amount,
+      currency: p.currency,
+      first_due_date: p.first_due_date,
+      recurrence: p.recurrence,
+    })
   }
   const cancelEdit = () => {
     setEditing(null)
+    setFormOpen(false)
     setForm(empty)
     setError(null)
   }
@@ -44,7 +71,11 @@ export function RecurringPaymentsPage() {
         const p = unwrap(
           await api.PATCH('/api/v1/recurring-payments/{payment_id}', {
             params: { path: { payment_id: editing.id } },
-            body: { title: form.title.trim(), amount: form.amount.replace(',', '.').replace(/\s/g, ''), currency: form.currency as 'RUB' },
+            body: {
+              title: form.title.trim(),
+              amount: form.amount.replace(',', '.').replace(/\s/g, ''),
+              currency: form.currency as 'RUB',
+            },
           }),
         )
         toast('ok', `«${p.title}» обновлён: новые значения действуют с ближайшего неоплаченного периода`)
@@ -71,6 +102,7 @@ export function RecurringPaymentsPage() {
       )
       toast('ok', `Платёж «${p.title}» добавлен, ближайший срок ${formatDate(p.next_due_date)}`)
       setForm(empty)
+      setFormOpen(false)
       list.reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка')
@@ -93,46 +125,151 @@ export function RecurringPaymentsPage() {
     }
   }
 
+  const actions = (p: RecurringPayment) =>
+    !p.is_deleted && (
+      <Menu label={`Действия: ${p.title}`}>
+        <MenuItem onClick={() => startEdit(p)}>
+          <Icon name="edit" /> Изменить
+        </MenuItem>
+        <MenuItem danger onClick={() => setDeleting(p)}>
+          <Icon name="trash" /> Удалить
+        </MenuItem>
+      </Menu>
+    )
+
   return (
     <>
-      <div className="win-window min-w-0 max-w-full">
-        <div className="win-titlebar">Регулярные платежи</div>
-        <div className="min-w-0 bg-paper-2 px-2 pt-2 pb-3 text-ink">
-      <PageTitle hideTitleOnDesk>Регулярные платежи</PageTitle>
-      <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 items-start">
-        <div className="space-y-4">
-        <form onSubmit={submit} className="sheet p-5" aria-labelledby="new-payment">
-          <h2 id="new-payment" className="font-sans text-lg font-semibold mb-3">
-            {editing ? `Изменить «${editing.title}»` : 'Новый платёж'}
-          </h2>
+      <PageTitle
+        aside={
+          <Button
+            variant="primary"
+            onClick={() => {
+              cancelEdit()
+              setFormOpen(true)
+            }}
+          >
+            <Icon name="plus" /> Новый платёж
+          </Button>
+        }
+      >
+        Регулярные платежи
+      </PageTitle>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-soft">Шаблоны расходов и даты следующих оплат</p>
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+          <Checkbox checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+          Показать прекращённые
+        </label>
+      </div>
+      <Card className="min-w-0">
+        {list.error ? (
+          <div className="p-4">
+            <ErrorNote text={list.error} onRetry={list.reload} />
+          </div>
+        ) : !list.data ? (
+          <Loading />
+        ) : !list.data.length ? (
+          <EmptyState
+            title="Платежей пока нет"
+            hint="Добавьте регулярный платёж, чтобы команда видела ближайшие сроки."
+            icon={<Icon name="repeat" />}
+          />
+        ) : (
+          <>
+            <ul className="divide-y divide-rule min-[1100px]:hidden">
+              {list.data.map((p) => (
+                <li key={p.id} className={`min-w-0 p-4 ${p.is_deleted ? 'text-ink-soft' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold break-words">{p.title}</p>
+                      <p className="num mt-1 whitespace-nowrap text-base">{formatMoney(p.amount, p.currency)}</p>
+                    </div>
+                    {actions(p)}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="text-ink-soft">
+                      {RECURRENCE_NAMES[p.recurrence]}, {p.anchor_day}-го
+                    </span>
+                    {p.is_deleted ? (
+                      <Badge tone="neutral">Прекращён</Badge>
+                    ) : (
+                      <span className="num whitespace-nowrap">{formatDate(p.next_due_date)}</span>
+                    )}
+                  </div>
+                  {p.is_deleted && <p className="mt-2 text-xs">Прекращён {formatDate(p.deleted_at?.slice(0, 10))}</p>}
+                </li>
+              ))}
+            </ul>
+            <Table className="hidden w-full min-[1100px]:table">
+              <thead>
+                <tr>
+                  <th className="w-full">Название</th>
+                  <th className="text-right">Сумма</th>
+                  <th>Периодичность</th>
+                  <th>Ближайший срок</th>
+                  <th>
+                    <span className="sr-only">Действия</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.map((p) => (
+                  <tr key={p.id} className={p.is_deleted ? 'text-ink-soft' : ''}>
+                    <td className="font-semibold [overflow-wrap:anywhere]">
+                      {p.title}
+                      {p.is_deleted && (
+                        <span className="mt-1 block text-xs font-normal">
+                          Прекращён {formatDate(p.deleted_at?.slice(0, 10))}
+                        </span>
+                      )}
+                    </td>
+                    <td className="num whitespace-nowrap text-right">{formatMoney(p.amount, p.currency)}</td>
+                    <td className="whitespace-nowrap text-sm">
+                      {RECURRENCE_NAMES[p.recurrence]}
+                      <span className="text-ink-soft">, {p.anchor_day}-го</span>
+                    </td>
+                    <td className="num whitespace-nowrap text-sm">
+                      {p.is_deleted ? <Badge tone="neutral">Прекращён</Badge> : formatDate(p.next_due_date)}
+                    </td>
+                    <td className="text-right">{actions(p)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </>
+        )}
+      </Card>
+      <Dialog open={formOpen} onClose={cancelEdit} title={editing ? 'Изменить платёж' : 'Новый регулярный платёж'}>
+        <form onSubmit={submit} className="space-y-4">
           {editing && (
-            <p className="text-xs text-ink-soft mb-3">
+            <p className="text-sm text-ink-soft">
               Оплаченные и прошедшие периоды сохранят прежнюю сумму. Срок и периодичность не меняются.
             </p>
           )}
-          <label className="label" htmlFor="p-title">
-            Название
-          </label>
-          <input
-            id="p-title"
-            className="field mb-3"
-            required
-            maxLength={200}
-            placeholder="Аренда офиса"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <div className="grid grid-cols-[1fr_6rem] gap-2 mb-3">
+          <div>
+            <label className="label" htmlFor="p-title">
+              Название
+            </label>
+            <Input
+              id="p-title"
+              required
+              maxLength={200}
+              placeholder="Аренда офиса"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
             <div>
               <label className="label" htmlFor="p-amount">
                 Сумма
               </label>
-              <input
+              <Input
                 id="p-amount"
-                className="field num"
+                className="num"
                 inputMode="decimal"
                 required
-                placeholder="55000.00"
+                placeholder="55 000,00"
                 pattern="^\s*\d[\d\s]*([.,]\d{1,2})?\s*$"
                 title="Число, не больше двух знаков после запятой"
                 value={form.amount}
@@ -143,144 +280,61 @@ export function RecurringPaymentsPage() {
               <label className="label" htmlFor="p-cur">
                 Валюта
               </label>
-              <select id="p-cur" className="field" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+              <Select id="p-cur" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
                 {CURRENCIES.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
-          <label className="label" htmlFor="p-date">
-            Дата ближайшей оплаты
-          </label>
-          <input
-            id="p-date"
-            type="date"
-            className="field num mb-1"
-            required
-            disabled={!!editing}
-            value={form.first_due_date}
-            onChange={(e) => setForm({ ...form, first_due_date: e.target.value })}
-          />
-          <p className="text-xs text-ink-soft mb-3">
-            Следующие сроки считаются от этого числа; если его нет в месяце — последний день месяца.
-          </p>
-          <label className="label" htmlFor="p-rec">
-            Периодичность
-          </label>
-          <select id="p-rec" className="field mb-4" disabled={!!editing} value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>
-            {Object.entries(RECURRENCE_NAMES).map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="label" htmlFor="p-date">
+              Дата ближайшей оплаты
+            </label>
+            <DateInput
+              key={`${formOpen}:${editing?.id ?? 'new'}`}
+              id="p-date"
+              required
+              disabled={!!editing}
+              value={form.first_due_date}
+              onChange={(value) => setForm({ ...form, first_due_date: value })}
+            />
+            <p className="mt-2 text-xs text-ink-soft">
+              Следующие сроки считаются от этого числа; если его нет в месяце — последний день месяца.
+            </p>
+          </div>
+          <div>
+            <label className="label" htmlFor="p-rec">
+              Периодичность
+            </label>
+            <Select
+              id="p-rec"
+              disabled={!!editing}
+              value={form.recurrence}
+              onChange={(e) => setForm({ ...form, recurrence: e.target.value })}
+            >
+              {Object.entries(RECURRENCE_NAMES).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </Select>
+          </div>
           {error && (
-            <p className="text-sm text-ink mb-3" role="alert">
+            <p className="text-sm text-overdue" role="alert">
               {error}
             </p>
           )}
-          <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" disabled={busy}>
-              {editing ? 'Сохранить' : 'Добавить'}
-            </button>
-            {editing && (
-              <button type="button" className="btn" onClick={cancelEdit}>
-                Отмена
-              </button>
-            )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Отмена
+            </Button>
+            <Button type="submit" variant="primary" loading={busy}>
+              {editing ? 'Сохранить' : 'Добавить платёж'}
+            </Button>
           </div>
         </form>
-        </div>
-
-        <div>
-          <label className="inline-flex items-center gap-2 text-sm mb-2">
-            <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
-            Показать прекращённые
-          </label>
-          <div className="sheet min-w-0">
-            {list.error ? (
-              <div className="p-4">
-                <ErrorNote text={list.error} onRetry={list.reload} />
-              </div>
-            ) : !list.data ? (
-              <Loading />
-            ) : list.data.length === 0 ? (
-              <Empty title="Платежей пока нет" hint="Добавьте первый платёж формой выше" />
-            ) : (
-              <>
-                <ul className="hand-only px-3">
-                  {list.data.map((p) => (
-                    <li key={p.id} className={`slip ${p.is_deleted ? 'text-ink-soft' : ''}`}>
-                      <div className="slip-row">
-                        <span className="font-semibold min-w-0">{p.title}</span>
-                        <span className="num">{formatMoney(p.amount, p.currency)}</span>
-                      </div>
-                      <div className="slip-row text-sm">
-                        <span>
-                          {RECURRENCE_NAMES[p.recurrence]}
-                          <span className="text-ink-soft">, {p.anchor_day}-го</span>
-                        </span>
-                        <span className="num">{p.is_deleted ? '—' : formatDate(p.next_due_date)}</span>
-                      </div>
-                      {p.is_deleted && <p className="text-xs">прекращён {formatDate(p.deleted_at?.slice(0, 10))}</p>}
-                      {!p.is_deleted && (
-                        <div className="slip-row">
-                          <button className="btn" onClick={() => startEdit(p)}>Изменить</button>
-                          <button className="btn" onClick={() => setDeleting(p)}>Удалить</button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <table className="ledger desk-only w-full table-fixed">
-                  <thead>
-                    <tr>
-                      <th>Название</th>
-                      <th className="text-right">Сумма</th>
-                      <th>Периодичность</th>
-                      <th>Ближайший срок</th>
-                      <th className="text-right">
-                        <span className="sr-only">Действия</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.data.map((p) => (
-                      <tr key={p.id} className={p.is_deleted ? 'text-ink-soft' : ''}>
-                        <td className="font-semibold">
-                          {p.title}
-                          {p.is_deleted && <span className="block text-xs font-normal">прекращён {formatDate(p.deleted_at?.slice(0, 10))}</span>}
-                        </td>
-                        <td className="num text-right">{formatMoney(p.amount, p.currency)}</td>
-                        <td className="text-sm">
-                          {RECURRENCE_NAMES[p.recurrence]}
-                          <span className="text-ink-soft">, {p.anchor_day}-го</span>
-                        </td>
-                        <td className="num text-sm">{p.is_deleted ? '—' : formatDate(p.next_due_date)}</td>
-                        <td className="text-right">
-                          {!p.is_deleted && (
-                            <span className="inline-flex flex-wrap justify-end gap-1">
-                              <button className="btn whitespace-normal" onClick={() => startEdit(p)}>
-                                Изменить
-                              </button>
-                              <button className="btn whitespace-normal" onClick={() => setDeleting(p)}>
-                                Удалить
-                              </button>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-        </div>
-      </div>
+      </Dialog>
       <ConfirmDialog
         open={!!deleting}
         title="Удалить регулярный платёж?"

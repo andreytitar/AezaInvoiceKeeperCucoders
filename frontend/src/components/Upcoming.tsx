@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
 import { api, unwrap, type Occurrence } from '../api/client'
 import { useLoad } from '../hooks/useLoad'
-import { days, dueHint, formatDate, formatMoney, parseISODate, toISODate } from '../i18n/format'
+import { formatDate, formatMoney, parseISODate, toISODate } from '../i18n/format'
+import { Icon } from './Icon'
 import { StatusCell, amountHot } from './Status'
+import { Badge, Button, Card, EmptyState, ErrorNote, Skeleton } from './ui'
 
 type Props = { today: string; version: number; onPay: (o: Occurrence) => void; busy: boolean }
 
@@ -20,181 +21,79 @@ function useTop5(query: Record<string, unknown>, deps: unknown[]) {
 }
 
 function Section({
-  title,
-  items,
-  total,
-  empty,
-  hint,
-  pay,
-  busy,
-  onPay,
-  hideHeading,
+  title, data, error, onRetry, empty, pay, busy, onPay, tone,
 }: {
   title: string
-  items: Occurrence[] | undefined
-  total: number | undefined
+  data: { items: Occurrence[]; total: number } | null
+  error: string | null
+  onRetry: () => void
   empty: string
-  hint: (o: Occurrence) => ReactNode
   pay: boolean
   busy: boolean
   onPay: (o: Occurrence) => void
-  hideHeading?: boolean
+  tone: 'neutral' | 'accent' | 'overdue'
 }) {
   return (
-    <section className="upcoming-section mb-4 last:mb-0" aria-label={title}>
-      {hideHeading ? (
-        <h2 className="sr-only">{title}</h2>
+    <Card className="upcoming-section min-w-0 overflow-hidden" aria-label={title}>
+      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {data && <Badge tone={data.total ? tone : 'neutral'}>{data.total}</Badge>}
+      </div>
+      {error ? (
+        <div className="px-4 pb-4"><ErrorNote text={error} onRetry={onRetry} /></div>
+      ) : !data ? (
+        <div className="space-y-2 px-5 pb-5"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
+      ) : data.items.length === 0 ? (
+        <div className="px-4 pb-4"><EmptyState title={empty} icon={<Icon name={tone === 'overdue' ? 'check' : 'calendar'} />} /></div>
       ) : (
-        <h2 className="upcoming-section__title mb-2 flex items-baseline justify-between gap-2 font-sans text-base font-semibold text-ink">
-          {title}
-          <span className="num text-xs font-normal text-ink-soft desk:text-sm">{total ?? '…'}</span>
-        </h2>
+        <ul className="divide-y divide-rule">
+          {data.items.map((o) => (
+            <li key={o.id} className="flex min-w-0 items-start justify-between gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <span className="min-w-0 text-sm font-medium">{o.title}</span>
+                  <span className={`num shrink-0 text-sm whitespace-nowrap ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <StatusCell o={o} />
+                  <span className="num text-xs text-ink-soft whitespace-nowrap">{formatDate(o.due_date)}</span>
+                </div>
+              </div>
+              {pay && (
+                <Button size="sm" variant="secondary" className="shrink-0" disabled={busy} onClick={() => onPay(o)} aria-label={`Отметить «${o.title}» оплаченным сегодня`} title="Отметить оплату сегодняшней датой">
+                  <Icon name="check" />
+                </Button>
+              )}
+            </li>
+          ))}
+          {data.total > data.items.length && (
+            <li className="px-5 py-2.5 text-xs text-ink-soft">Показаны первые {data.items.length} из {data.total}. Полный список — ниже.</li>
+          )}
+        </ul>
       )}
-      {!items ? (
-        <p className="text-sm text-ink-soft num mt-2">…</p>
-      ) : !items.length ? (
-        <p className="text-sm text-ink-soft mt-2">{empty}</p>
-      ) : (
-        <>
-          <ul className="hand-only">
-            {items.map((o) => (
-              <li key={o.id} className="slip">
-                <div className="slip-row">
-                  <span className="font-semibold min-w-0">{o.title}</span>
-                  <span className={`num min-w-0 break-all text-right ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
-                </div>
-                <div className="slip-row text-sm">
-                  <span className="num">{formatDate(o.due_date)}</span>
-                  <span className="text-ink-soft">{hint(o)}</span>
-                </div>
-                <div className="slip-row">
-                  {!pay && <StatusCell o={o} />}
-                  {pay && (
-                    <>
-                      <span className="desk-only">
-                        <StatusCell o={o} />
-                      </span>
-                      <button
-                        className="btn btn-primary w-full desk:w-auto"
-                        disabled={busy}
-                        onClick={() => onPay(o)}
-                        aria-label={`Отметить «${o.title}» оплаченным сегодня`}
-                      >
-                        Оплачено
-                      </button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <table className="ledger desk-only w-full">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th className="text-right">Сумма</th>
-                <th>Дата</th>
-                <th>Статус</th>
-                {pay && (
-                  <th className="text-right">
-                    <span className="sr-only">Действия</span>
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((o) => (
-                <tr key={o.id}>
-                  <td className="font-semibold">{o.title}</td>
-                  <td className={`num text-right whitespace-nowrap ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</td>
-                  <td className="num text-sm">{formatDate(o.due_date)}</td>
-                  <td>
-                    <StatusCell o={o} />
-                    <span className="block text-xs text-ink-soft mt-0.5">{hint(o)}</span>
-                  </td>
-                  {pay && (
-                    <td className="text-right">
-                      <button className="btn btn-primary whitespace-normal" disabled={busy} onClick={() => onPay(o)} aria-label={`Отметить «${o.title}» оплаченным сегодня`}>
-                        Оплачено
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-    </section>
+    </Card>
   )
 }
 
-/** Что просрочено, что оплатить в ближайшие 7 дней, что оплачено недавно. */
+/** Короткая сводка срочных платежей. История последних оплат раскрывается отдельно. */
 export function Upcoming({ today, version, onPay, busy }: Props) {
   const overdue = useTop5({ status: 'unpaid', overdue: true, sort: 'due_date' }, [today, version])
   const soon = useTop5({ status: 'unpaid', overdue: false, to: addDays(today, 7), sort: 'due_date' }, [today, version])
   const paid = useTop5({ status: 'paid', sort: '-paid_date' }, [today, version])
 
   return (
-    <div className="mb-5 upcoming-block">
-      <Section
-        title="Просрочено"
-        items={overdue.data?.items}
-        total={overdue.data?.total}
-        empty="Просрочек нет"
-        pay
-        busy={busy}
-        onPay={onPay}
-        hint={(o) => (
-          <>
-            <span className="hand-only">{days(o.overdue_days)}</span>
-            <span className="desk-only">
-              {days(o.overdue_days)}, срок {formatDate(o.due_date)}
-            </span>
-          </>
-        )}
-      />
-      <Section
-        title="Ближайшие 7 дней"
-        items={soon.data?.items}
-        total={soon.data?.total}
-        empty="В ближайшую неделю платежей нет"
-        pay
-        busy={busy}
-        onPay={onPay}
-        hint={(o) => (
-          <>
-            <span className={`hand-only ${o.days_until_due <= 3 ? 'font-semibold text-ink' : ''}`}>{dueHint(o.days_until_due)}</span>
-            <span className={`desk-only ${o.days_until_due <= 3 ? 'font-semibold text-ink' : ''}`}>
-              {dueHint(o.days_until_due)}, {formatDate(o.due_date)}
-            </span>
-          </>
-        )}
-      />
-      <details className="upcoming-recent mt-2 border-t border-rule pt-2 desk:mt-0 desk:border-0 desk:pt-0">
-        <summary className="cursor-pointer list-none font-sans text-base font-semibold text-ink [&::-webkit-details-marker]:hidden">
-          <span className="flex items-baseline justify-between gap-2">
-            Оплачено недавно
-            <span className="num text-sm font-normal text-ink-soft">{paid.data?.total ?? '…'}</span>
-          </span>
+    <div className="upcoming-block mb-6 space-y-3">
+      <div className="upcoming-grid grid min-w-0 gap-4 lg:grid-cols-2">
+        <Section title="Просрочено" data={overdue.data} error={overdue.error} onRetry={overdue.reload} empty="Просрочек нет" pay busy={busy} onPay={onPay} tone="overdue" />
+        <Section title="Ближайшие 7 дней" data={soon.data} error={soon.error} onRetry={soon.reload} empty="На этой неделе платежей нет" pay busy={busy} onPay={onPay} tone="accent" />
+      </div>
+      <details className="upcoming-recent">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-2 text-sm text-ink-soft [&::-webkit-details-marker]:hidden">
+          <span>Оплачено недавно{paid.data ? ` · ${paid.data.total}` : ''}</span>
+          <Icon name="chevron-right" />
         </summary>
         <div className="mt-2">
-          <Section
-            title="Оплачено недавно"
-            hideHeading
-            items={paid.data?.items}
-            total={paid.data?.total}
-            empty="Оплат ещё не было"
-            pay={false}
-            busy={busy}
-            onPay={onPay}
-            hint={(o) => (
-              <>
-                {formatDate(o.paid_date)}
-                {o.is_overdue ? <span>, с опозданием</span> : null}
-              </>
-            )}
-          />
+          <Section title="Последние оплаты" data={paid.data} error={paid.error} onRetry={paid.reload} empty="Оплат ещё не было" pay={false} busy={busy} onPay={onPay} tone="neutral" />
         </div>
       </details>
     </div>

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { Toast as ToastMessage } from '../components/ui'
 
 type Toast = { id: number; kind: 'ok' | 'error'; text: string }
 const ToastCtx = createContext<(kind: Toast['kind'], text: string) => void>(() => {})
@@ -13,11 +14,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-[min(24rem,calc(100vw-2rem))]" role="status" aria-live="polite">
+      <div className="toast-stack" role="status" aria-live="polite" aria-atomic="false">
         {items.map((t) => (
-          <div key={t.id} className="fade-in sheet px-4 py-3 text-sm">
+          <ToastMessage key={t.id} kind={t.kind} onDismiss={() => setItems((xs) => xs.filter((x) => x.id !== t.id))}>
             {t.text}
-          </div>
+          </ToastMessage>
         ))}
       </div>
     </ToastCtx.Provider>

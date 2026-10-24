@@ -4,20 +4,13 @@ import { needsPayConfirm } from '../components/largePayment'
 import { MarkPaidDialog } from '../components/MarkPaidDialog'
 import { PaymentRowActions } from '../components/PaymentRowActions'
 import { ReceiptDialog } from '../components/ReceiptDialog'
-import { OverdueCell, StatusCell, amountHot } from '../components/Status'
+import { StatusCell, amountHot } from '../components/Status'
+import { Icon } from '../components/Icon'
 import { SummaryCards } from '../components/SummaryCards'
 import { Upcoming } from '../components/Upcoming'
 import {
-  ConfirmDialog,
-  Empty,
-  ErrorNote,
-  FilterField,
-  FilterFieldAction,
-  Loading,
-  PageTitle,
-  filterActionBtnCls,
-  filterControlCls,
-  paymentsFilterRowCls,
+  Button, Card, ConfirmDialog, DateInput, Dialog, EmptyState, ErrorNote,
+  FilterField, Input, PageTitle, Select, Skeleton, Table, Tabs,
 } from '../components/ui'
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
@@ -83,6 +76,7 @@ export function DashboardPage() {
   const [busy, setBusy] = useState(false)
   const [version, setVersion] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filterResetVersion, setFilterResetVersion] = useState(0)
 
   useEffect(() => {
     try {
@@ -118,6 +112,24 @@ export function DashboardPage() {
     [JSON.stringify(summaryQuery)],
   )
 
+  const countQuery = useMemo(() => {
+    const base = { ...query }
+    for (const key of ['status', 'overdue', 'page', 'page_size', 'sort']) delete base[key]
+    return base
+  }, [query])
+  const counts = useLoad(async () => {
+    const values = await Promise.all(TABS.map(async ({ id }) => {
+      const q: Record<string, string | number | boolean> = { ...countQuery, page_size: 1 }
+      if (id === 'topay' || id === 'overdue') q.status = 'unpaid'
+      if (id === 'paid') q.status = 'paid'
+      if (id === 'overdue') q.overdue = true
+      else if (f.overdue) q.overdue = f.overdue === 'true'
+      const data = unwrap(await api.GET('/api/v1/payment-occurrences', { params: { query: q as never } }))
+      return [id, data.total] as const
+    }))
+    return Object.fromEntries(values) as Record<Tab, number>
+  }, [JSON.stringify(countQuery), f.overdue])
+
   const set = (patch: Partial<Filters>) => {
     setF((x) => ({ ...x, ...patch }))
     setPage(1)
@@ -130,6 +142,7 @@ export function DashboardPage() {
   const refresh = () => {
     list.reload()
     summary.reload()
+    counts.reload()
     setVersion((v) => v + 1)
   }
 
@@ -200,29 +213,59 @@ export function DashboardPage() {
   }
 
   const pages = list.data ? Math.max(1, Math.ceil(list.data.total / PAGE_SIZE)) : 1
-  const hasExtraFilters = f.currency || f.overdue || f.from || f.to || f.q
+  useEffect(() => {
+    if (list.data && page > pages) setPage(pages)
+  }, [list.data, page, pages])
+  const hasExtraFilters = Boolean(f.currency || f.overdue || f.from || f.to || f.q)
+  const activeFilters = [f.currency, f.overdue, f.from, f.to, f.q].filter(Boolean).length
+  const resetFilters = () => {
+    set({ currency: '', overdue: '', from: '', to: '', q: '' })
+    setFilterResetVersion((value) => value + 1)
+  }
+  const filterControls = (prefix: string) => (
+    <div className={prefix === 'mobile' ? 'grid grid-cols-1 gap-4' : 'payment-filters-grid'}>
+      <FilterField label="Поиск" htmlFor={`${prefix}-q`}>
+        <Input id={`${prefix}-q`} placeholder="Название платежа" value={f.q} onChange={(e) => set({ q: e.target.value })} />
+      </FilterField>
+      <FilterField label="Валюта" htmlFor={`${prefix}-cur`}>
+        <Select id={`${prefix}-cur`} value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
+          <option value="">Все валюты</option>
+          {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+        </Select>
+      </FilterField>
+      <FilterField label="Просрочка" htmlFor={`${prefix}-over`}>
+        <Select id={`${prefix}-over`} value={f.tab === 'overdue' ? 'true' : f.overdue} disabled={f.tab === 'overdue'} onChange={(e) => set({ overdue: e.target.value as Filters['overdue'] })}>
+          <option value="">Любая</option>
+          <option value="true">С просрочкой</option>
+          <option value="false">Без просрочки</option>
+        </Select>
+      </FilterField>
+      <FilterField label="Срок с" htmlFor={`${prefix}-from`}>
+        <DateInput key={`${prefix}-from-${filterResetVersion}`} id={`${prefix}-from`} value={f.from} max={f.to || undefined} onChange={(value) => set({ from: value })} />
+      </FilterField>
+      <FilterField label="По" htmlFor={`${prefix}-to`}>
+        <DateInput key={`${prefix}-to-${filterResetVersion}`} id={`${prefix}-to`} value={f.to} min={f.from || undefined} onChange={(value) => set({ to: value })} />
+      </FilterField>
+      <Button type="button" variant="ghost" onClick={resetFilters}>Сбросить</Button>
+    </div>
+  )
 
   return (
     <>
-      <div className="win-window min-w-0 max-w-full">
-        <div className="win-titlebar">Платежи</div>
-        <div className="dashboard-body min-w-0 bg-paper-2 px-3 pt-2 pb-3 text-ink desk:px-4">
-      <PageTitle
-        hideTitleOnDesk
-        aside={
-          <span className="flex items-center gap-2 flex-wrap desk:ml-auto">
-            <span className="text-sm text-ink-soft">
-              <span className="num text-ink">{formatDate(today)}</span>
-              {fake && <span className="ml-2 num text-xs text-ink-soft">[fake]</span>}
-            </span>
-            {isAdmin && (
-              <button className="btn btn-primary btn-sm desk:min-h-[44px]" onClick={runChecks} disabled={busy} title="Периоды и напоминания сейчас">
-                Проверить
-              </button>
-            )}
+      <PageTitle aside={
+        <div className="dashboard-toolbar flex flex-wrap items-center gap-3">
+          <span className="num whitespace-nowrap text-sm text-ink-soft">
+            {formatDate(today)}
+            {fake && <span className="ml-2 text-xs" title="Дата в демонстрационном окружении">Демо-дата</span>}
           </span>
-        }
-      >
+          {isAdmin && (
+            <Button variant="secondary" onClick={runChecks} loading={busy} title="Создать периоды и отправить напоминания сейчас">
+              <Icon name="bell" />
+              Проверить напоминания
+            </Button>
+          )}
+        </div>
+      }>
         Платежи
       </PageTitle>
 
@@ -231,239 +274,103 @@ export function DashboardPage() {
       ) : summary.data ? (
         <SummaryCards summary={summary.data} />
       ) : (
-        <Loading />
+        <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="Загрузка итогов" role="status">
+          {[0, 1, 2].map((key) => <Card key={key} className="space-y-4 p-5"><Skeleton className="h-4 w-20" /><Skeleton className="h-9 w-3/4" /><Skeleton className="h-20 w-full" /></Card>)}
+        </div>
       )}
 
       <Upcoming today={today} version={version} busy={busy} onPay={(o) => startMarkPaid(o, today)} />
 
-      <div className="mb-3 flex gap-1 overflow-x-auto pb-0.5" role="tablist" aria-label="Что показать">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={f.tab === t.id}
-            onClick={() => set({ tab: t.id })}
-            className={`shrink-0 rounded-sm px-2.5 py-1.5 text-sm min-h-[44px] desk:min-h-0 ${
-              f.tab === t.id ? 'bg-ink font-semibold text-paper-2' : 'text-ink-soft hover:text-ink'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="hand-only mb-4">
-        <label className="label" htmlFor="f-sort">
-          Сортировка
-        </label>
-        <select id="f-sort" className="field" value={f.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
-          {SORTS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="hand-only mb-2">
-        <button
-          type="button"
-          className="btn btn-ghost flex w-full min-h-[44px] items-center justify-between gap-2 px-2"
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          <span>Фильтры{hasExtraFilters ? ' · активны' : ''}</span>
-          <span className="text-ink-soft" aria-hidden="true">
-            {filtersOpen ? '▴' : '▾'}
-          </span>
-        </button>
-      </div>
-
-      <div className={`payments-filters ${paymentsFilterRowCls} ${filtersOpen ? '' : 'hand:hidden'}`}>
-        <FilterField label="Поиск" htmlFor="f-q">
-          <input
-            id="f-q"
-            className={filterControlCls}
-            placeholder="Название"
-            value={f.q}
-            onChange={(e) => set({ q: e.target.value })}
-          />
-        </FilterField>
-        <FilterField label="Валюта" htmlFor="f-cur">
-          <select id="f-cur" className={filterControlCls} value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
-            <option value="">Все</option>
-            {CURRENCIES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Просрочка" htmlFor="f-over">
-          <select
-            id="f-over"
-            className={filterControlCls}
-            value={f.tab === 'overdue' ? 'true' : f.overdue}
-            disabled={f.tab === 'overdue'}
-            onChange={(e) => set({ overdue: e.target.value as Filters['overdue'] })}
-          >
-            <option value="">Любая</option>
-            <option value="true">С просрочкой</option>
-            <option value="false">Без просрочки</option>
-          </select>
-        </FilterField>
-        <FilterField label="Срок с" htmlFor="f-from">
-          <input
-            id="f-from"
-            type="date"
-            className={`${filterControlCls} num`}
-            value={f.from}
-            onChange={(e) => set({ from: e.target.value })}
-          />
-        </FilterField>
-        <FilterField label="По" htmlFor="f-to">
-          <input id="f-to" type="date" className={`${filterControlCls} num`} value={f.to} onChange={(e) => set({ to: e.target.value })} />
-        </FilterField>
-        <FilterFieldAction label="Сбросить">
-          <button
-            type="button"
-            className={filterActionBtnCls}
-            disabled={!hasExtraFilters}
-            onClick={() => set({ currency: '', overdue: '', from: '', to: '', q: '' })}
-          >
-            Сбросить
-          </button>
-        </FilterFieldAction>
-      </div>
-
-      <div className="payments-list-sheet sheet min-w-0 desk:rounded-sm">
-        {list.error ? (
-          <div className="p-4">
-            <ErrorNote text={list.error} onRetry={list.reload} />
+      <Card className="payments-list-sheet min-w-0">
+        <div className="space-y-4 p-4 lg:p-5">
+          <Tabs label="Статус платежей" items={TABS.map((t) => ({ value: t.id, label: t.label, count: counts.data?.[t.id] ?? (t.id === f.tab ? list.data?.total : undefined) }))} value={f.tab} onChange={(value) => set({ tab: value as Tab })} />
+          <div className="payment-filters-desktop">{filterControls('desktop')}</div>
+          <div className="payment-filters-mobile flex flex-wrap items-center gap-2">
+            <Input className="min-w-0 flex-1" aria-label="Поиск платежа" placeholder="Найти платёж" value={f.q} onChange={(e) => set({ q: e.target.value })} />
+            <Button variant="secondary" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog" aria-expanded={filtersOpen}>
+              <Icon name="filter" />
+              Фильтры{activeFilters ? ` · ${activeFilters}` : ''}
+            </Button>
           </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-ink-soft" role="status">{list.data ? `Найдено: ${list.data.total}` : 'Загрузка платежей…'}</p>
+            <Select className="payments-sort w-auto max-w-full text-sm" aria-label="Сортировка платежей" value={f.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
+              {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
+          </div>
+        </div>
+
+        {list.error ? (
+          <div className="p-4"><ErrorNote text={list.error} onRetry={list.reload} /></div>
         ) : !list.data ? (
-          <Loading />
+          <div className="space-y-4 border-t border-rule p-5" aria-label="Загрузка платежей" role="status">
+            {[0, 1, 2, 3].map((key) => <Skeleton key={key} className="h-14 w-full" />)}
+          </div>
         ) : list.data.items.length === 0 ? (
-          <Empty
-            title={f.tab === 'overdue' ? 'Просрочек нет' : f.tab === 'topay' ? 'Всё оплачено' : 'Ничего не найдено'}
-            hint={hasExtraFilters ? 'Попробуйте сбросить фильтры' : undefined}
-          />
+          <EmptyState title={f.tab === 'overdue' ? 'Просрочек нет' : f.tab === 'topay' ? 'Всё оплачено' : 'Ничего не найдено'} hint={hasExtraFilters ? 'Попробуйте сбросить фильтры' : 'Здесь появятся периоды регулярных платежей'} icon={<Icon name={f.tab === 'overdue' || f.tab === 'topay' ? 'check' : 'search'} />} />
         ) : (
           <>
-          <ul className={`hand-only ${list.loading ? 'opacity-60' : ''}`}>
-            {list.data.items.map((o) => (
-              <li key={o.id} className="slip">
-                <div className="slip-row">
-                  <span className="font-semibold min-w-0">{o.title}</span>
-                  <span className={`num min-w-0 break-all text-right ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
-                </div>
-                <div className="slip-row text-sm">
-                  <span className="num">срок {formatDate(o.due_date)}</span>
-                  <StatusCell o={o} />
-                </div>
-                <div className="slip-row text-sm">
-                  <OverdueCell o={o} />
-                  {o.paid_date && <span className="num text-ink-soft">оплачено {formatDate(o.paid_date)}</span>}
-                </div>
-                {o.recurring_payment_deleted && <p className="text-xs text-ink-soft">платёж прекращён</p>}
-                <PaymentRowActions
-                  occurrence={o}
-                  busy={busy}
-                  placement="slip"
-                  onPaidToday={() => startMarkPaid(o, today)}
-                  onPickDate={() => setPaying(o)}
-                  onReceipt={() => setReceiptFor(o)}
-                  onUnpay={() => setPending({ kind: 'unpay', occurrence: o })}
-                />
-              </li>
-            ))}
-          </ul>
-          <table className={`ledger desk-only w-full ${list.loading ? 'opacity-60' : ''}`}>
-            <thead>
-              <tr>
-                <th aria-sort={ariaSort('title')}>
-                  <button onClick={() => toggleSort('title')}>Название{sortMark('title')}</button>
-                </th>
-                <th className="text-right" aria-sort={ariaSort('amount')}>
-                  <button onClick={() => toggleSort('amount')}>Сумма{sortMark('amount')}</button>
-                </th>
-                <th>Валюта</th>
-                <th aria-sort={ariaSort('due_date')}>
-                  <button onClick={() => toggleSort('due_date')}>Срок{sortMark('due_date')}</button>
-                </th>
-                <th>Статус</th>
-                <th aria-sort={ariaSort('paid_date')}>
-                  <button onClick={() => toggleSort('paid_date')}>Дата оплаты{sortMark('paid_date')}</button>
-                </th>
-                <th>Просрочка</th>
-                <th className="w-px whitespace-nowrap text-right">
-                  <span className="sr-only">Действия</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+            <ul className={`payments-cards divide-y divide-rule border-t border-rule ${list.loading ? 'opacity-60' : ''}`} aria-busy={list.loading}>
               {list.data.items.map((o) => (
-                <tr key={o.id}>
-                  <td>
-                    <span className="font-semibold">{o.title}</span>
-                    {o.has_receipt && (
-                      <button className="ml-2 text-xs uppercase tracking-wider text-ink-soft align-middle" onClick={() => setReceiptFor(o)} title="Открыть чек">
-                        чек
-                      </button>
-                    )}
-                    {o.recurring_payment_deleted && (
-                      <span className="block text-xs text-ink-soft" title="Регулярный платёж прекращён, история сохранена">
-                        платёж прекращён
-                      </span>
-                    )}
-                  </td>
-                  <td className={`num text-right ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</td>
-                  <td className="num text-sm">{o.currency}</td>
-                  <td className="num text-sm">{formatDate(o.due_date)}</td>
-                  <td>
+                <li key={o.id} className="space-y-3 p-4">
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                    <span className="min-w-0 font-medium">{o.title}</span>
+                    <span className={`num shrink-0 text-right whitespace-nowrap ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
+                  </div>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <StatusCell o={o} />
-                  </td>
-                  <td className="num text-sm">{formatDate(o.paid_date)}</td>
-                  <td>
-                    <OverdueCell o={o} />
-                  </td>
-                  <td className="w-px whitespace-nowrap text-right">
-                    <PaymentRowActions
-                      occurrence={o}
-                      busy={busy}
-                      placement="table"
-                      onPaidToday={() => startMarkPaid(o, today)}
-                      onPickDate={() => setPaying(o)}
-                      onReceipt={() => setReceiptFor(o)}
-                      onUnpay={() => setPending({ kind: 'unpay', occurrence: o })}
-                    />
-                  </td>
-                </tr>
+                    <span className="num whitespace-nowrap text-xs text-ink-soft">Срок {formatDate(o.due_date)}</span>
+                  </div>
+                  {o.recurring_payment_deleted && <p className="text-xs text-ink-soft">Регулярный платёж прекращён</p>}
+                  <PaymentRowActions occurrence={o} busy={busy} placement="slip" onPaidToday={() => startMarkPaid(o, today)} onPickDate={() => setPaying(o)} onReceipt={() => setReceiptFor(o)} onUnpay={() => setPending({ kind: 'unpay', occurrence: o })} />
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+            <Table className={`payments-table w-full ${list.loading ? 'opacity-60' : ''}`} aria-busy={list.loading}>
+              <thead>
+                <tr>
+                  <th aria-sort={ariaSort('title')}><button onClick={() => toggleSort('title')} className="whitespace-nowrap">Название{sortMark('title')}</button></th>
+                  <th className="text-right whitespace-nowrap" aria-sort={ariaSort('amount')}><button onClick={() => toggleSort('amount')}>Сумма{sortMark('amount')}</button></th>
+                  <th className="whitespace-nowrap" aria-sort={ariaSort('due_date')}><button onClick={() => toggleSort('due_date')}>Срок{sortMark('due_date')}</button></th>
+                  <th className="whitespace-nowrap">Статус и оплата</th>
+                  <th className="w-px whitespace-nowrap text-right"><span className="sr-only">Действия</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.items.map((o) => (
+                  <tr key={o.id}>
+                    <td className="min-w-0">
+                      <span className="font-medium">{o.title}</span>
+                      {o.has_receipt && <Button variant="ghost" size="sm" className="ml-1 align-middle" onClick={() => setReceiptFor(o)} aria-label={`Открыть чек для «${o.title}»`} title="Открыть чек"><Icon name="receipt" /></Button>}
+                      {o.recurring_payment_deleted && <span className="mt-1 block text-xs text-ink-soft">Платёж прекращён</span>}
+                    </td>
+                    <td className={`num text-right whitespace-nowrap ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</td>
+                    <td className="num whitespace-nowrap text-xs">{formatDate(o.due_date)}</td>
+                    <td><StatusCell o={o} /></td>
+                    <td className="w-px whitespace-nowrap text-right"><PaymentRowActions occurrence={o} busy={busy} placement="table" onPaidToday={() => startMarkPaid(o, today)} onPickDate={() => setPaying(o)} onReceipt={() => setReceiptFor(o)} onUnpay={() => setPending({ kind: 'unpay', occurrence: o })} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
           </>
         )}
-      </div>
 
-      {list.data && list.data.total > PAGE_SIZE && (
-        <nav className="flex flex-col gap-2 desk:flex-row desk:items-center desk:justify-between mt-3 text-sm" aria-label="Страницы">
-          <span className="text-ink-soft">
-            Всего: <span className="num">{list.data.total}</span>
-          </span>
-          <span className="flex flex-wrap items-center gap-2">
-            <button className="btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Назад
-            </button>
-            <span className="num">
-              {page} / {pages}
-            </span>
-            <button className="btn" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-              Вперёд
-            </button>
-          </span>
-        </nav>
-      )}
-        </div>
-      </div>
+        {list.data && list.data.total > PAGE_SIZE && (
+          <nav className="flex flex-wrap items-center justify-between gap-3 border-t border-rule p-4 text-sm" aria-label="Страницы платежей">
+            <span className="text-xs text-ink-soft">Всего: <span className="num">{list.data.total}</span></span>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="Предыдущая страница"><Icon name="chevron-left" /></Button>
+              <span className="num whitespace-nowrap text-xs">{page} / {pages}</span>
+              <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage(page + 1)} aria-label="Следующая страница"><Icon name="chevron-right" /></Button>
+            </div>
+          </nav>
+        )}
+      </Card>
+
+      <Dialog open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Фильтры платежей">
+        {filterControls('mobile')}
+        <div className="mt-6 flex justify-end"><Button variant="primary" onClick={() => setFiltersOpen(false)}>Показать платежи</Button></div>
+      </Dialog>
 
       <MarkPaidDialog
         occurrence={paying}
