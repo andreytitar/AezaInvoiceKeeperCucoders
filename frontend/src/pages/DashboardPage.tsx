@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, unwrap, type Occurrence } from '../api/client'
 import { MarkPaidDialog } from '../components/MarkPaidDialog'
 import { ReceiptDialog } from '../components/ReceiptDialog'
@@ -143,6 +143,25 @@ export function DashboardPage() {
     }
   }
 
+  const qrInput = useRef<HTMLInputElement>(null)
+  const scanReceipt = async (file: File) => {
+    setBusy(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/v1/receipts/scan', { method: 'POST', body: form, credentials: 'same-origin' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error?.message ?? `Ошибка ${res.status}`)
+      toast(body.status === 'matched' ? 'ok' : 'error', body.message)
+      if (body.status === 'matched') refresh()
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setBusy(false)
+      if (qrInput.current) qrInput.current.value = ''
+    }
+  }
+
   const runChecks = async () => {
     setBusy(true)
     try {
@@ -174,6 +193,21 @@ export function DashboardPage() {
               Сегодня <span className="num text-ink">{formatDate(today)}</span>
               {fake && <span className="ml-2 text-amber num text-xs">[APP_FAKE_TODAY]</span>}
             </span>
+            <input
+              ref={qrInput}
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && scanReceipt(e.target.files[0])}
+            />
+            <button
+              className="btn btn-sm"
+              onClick={() => qrInput.current?.click()}
+              disabled={busy}
+              title="Фото или PDF кассового чека: сумма и дата берутся из QR, оплата отмечается сама"
+            >
+              Чек по QR
+            </button>
             {isAdmin && (
               <button className="btn btn-sm" onClick={runChecks} disabled={busy} title="Сгенерировать периоды и разослать напоминания прямо сейчас">
                 Проверить сейчас

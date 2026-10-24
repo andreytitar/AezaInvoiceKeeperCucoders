@@ -22,6 +22,7 @@ from app.models import TelegramUpdatesOffset
 from app.repositories.users import UserRepository
 from app.domain.phrase import parse_payment_phrase
 from app.services.payments import PaymentService
+from app.services.receipt_scan import ReceiptScanService
 from app.services.reminders import dispatch_now
 from app.services.bot_answers import HELP, BotAnswers, command_for_text
 from app.services.occurrences import OccurrenceService
@@ -158,9 +159,8 @@ class TelegramUpdateHandler:
         text = (msg.get("text") or msg.get("caption") or "").strip()
 
         if msg.get("photo") or msg.get("document"):
-            handler = self.c.extras.get("telegram_receipt_handler")
-            if handler and private:
-                await handler(self, msg)
+            if private:
+                await self._scan_receipt(msg, chat_id, tg_id)
             return
 
         if text.startswith("/"):
@@ -254,6 +254,39 @@ class TelegramUpdateHandler:
                 )
             except TelegramError:
                 pass
+
+    async def _scan_receipt(self, msg: dict, chat_id, tg_id) -> None:
+        """Фото или PDF чека в личке: QR → поиск платежа → отметка оплаты и прикрепление чека."""
+        with self.c.session_factory() as db:
+            user = UserRepository(db).get_by_telegram_id(int(tg_id)) if tg_id else None
+        if user is None:
+            await self._send(chat_id, "Сначала привяжите Telegram в панели (кнопка «Telegram» → «Привязать Telegram»).")
+            return
+        if msg.get("photo"):
+            file_id, name = msg["photo"][-1]["file_id"], None  # самое большое разрешение
+        else:
+            doc = msg["document"]
+            file_id, name = doc["file_id"], doc.get("file_name")
+            if (doc.get("file_size") or 0) > self.c.settings.receipt_max_bytes:
+                await self._send(chat_id, "Файл больше 5 МБ.", reply_to=msg.get("message_id"))
+                return
+        try:
+            info = await self.client.get_file(file_id)
+            data = await self.client.download_file(info["file_path"], self.c.settings.receipt_max_bytes)
+        except (TelegramError, KeyError) as exc:
+            await self._send(chat_id, f"Не удалось скачать файл: {html.escape(str(exc))}", reply_to=msg.get("message_id"))
+            return
+        token = request_context.set(RequestContext(user_agent="telegram-bot", actor_id=user.id, actor_login=user.login))
+        try:
+            with self.c.session_factory() as db:
+                actor = UserRepository(db).get(user.id)
+                result = ReceiptScanService(db, self.c.clock, self.c.settings).scan(data, name, actor)
+        except DomainError as exc:
+            await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}", reply_to=msg.get("message_id"))
+            return
+        finally:
+            request_context.reset(token)
+        await self._send(chat_id, html.escape(result.message), reply_to=msg.get("message_id"))
 
     async def _cmd_start(self, chat_id, tg_id, code: str, private: bool) -> None:
         if not code:

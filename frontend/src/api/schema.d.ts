@@ -553,6 +553,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/receipts/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Распознать кассовый чек по QR и отметить оплату
+         * @description Фото (PNG/JPG) или PDF чека до 5 МБ. Из QR-кода (формат ФНС) берутся сумма и дата; находится неоплаченный период в рублях с этой суммой и ближайшим сроком (±60 дней), он отмечается оплаченным датой чека, чек прикрепляется. Повторно тот же чек не засчитывается.
+         */
+        post: operations["scan_receipt_api_v1_receipts_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -609,6 +629,11 @@ export interface components {
             url?: string | null;
             /** File */
             file?: string | null;
+        };
+        /** Body_scan_receipt_api_v1_receipts_scan_post */
+        Body_scan_receipt_api_v1_receipts_scan_post: {
+            /** File */
+            file: string;
         };
         /** Body_token_api_v1_auth_token_post */
         Body_token_api_v1_auth_token_post: {
@@ -822,6 +847,18 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** FiscalOut */
+        FiscalOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Amount */
+            amount: string;
+            /** Operation */
+            operation: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1127,6 +1164,18 @@ export interface components {
          * @enum {string}
          */
         Role: "admin" | "user";
+        /** ScanOut */
+        ScanOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "already_counted" | "no_match" | "not_receipt";
+            /** Message */
+            message: string;
+            receipt: components["schemas"]["FiscalOut"] | null;
+            occurrence: components["schemas"]["OccurrenceOut"] | null;
+        };
         /** SummaryOut */
         SummaryOut: {
             /**
@@ -3240,6 +3289,55 @@ export interface operations {
             };
             /** @description Недостаточно прав */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    scan_receipt_api_v1_receipts_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_scan_receipt_api_v1_receipts_scan_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Файл больше 5 МБ */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ошибка валидации */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import admin_tools, audit_logs, auth, budgets, health, payment_occurrences, payments_summary, receipts, recurring_payments, telegram, users, webhooks
+from app.api.v1 import admin_tools, audit_logs, auth, budgets, health, payment_occurrences, payments_summary, receipt_scan, receipts, recurring_payments, telegram, users, webhooks
 
 router = APIRouter()
 router.include_router(health.router)
@@ -15,3 +15,4 @@ router.include_router(budgets.router)
 router.include_router(webhooks.router)
 router.include_router(admin_tools.router)
 router.include_router(telegram.router)
+router.include_router(receipt_scan.router)

@@ -63,6 +63,8 @@ class ReceiptService:
         file_bytes: bytes | None,
         file_name: str | None,
         actor: User | None,
+        fiscal_sign: str | None = None,
+        commit: bool = True,
     ) -> Receipt:
         self._occurrence(occurrence_id)
         if not url and file_bytes is None:
@@ -93,11 +95,16 @@ class ReceiptService:
             r.mime = mime
             r.size = len(file_bytes or b"")
         r.uploaded_by = actor.id if actor else None
+        if fiscal_sign:
+            r.fiscal_sign = fiscal_sign
         AuditService(self.db, self.clock).log(
             "receipt.upsert", entity_type="payment_occurrence", entity_id=occurrence_id,
             before=before, after=_snapshot(r), actor=actor,
         )
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         if old_file:
             self.storage.delete(old_file)
         return r

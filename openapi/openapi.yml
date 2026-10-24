@@ -1737,6 +1737,44 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/receipts/scan:
+    post:
+      tags:
+      - receipts
+      summary: Распознать кассовый чек по QR и отметить оплату
+      description: Фото (PNG/JPG) или PDF чека до 5 МБ. Из QR-кода (формат ФНС) берутся сумма и дата; находится неоплаченный
+        период в рублях с этой суммой и ближайшим сроком (±60 дней), он отмечается оплаченным датой чека, чек прикрепляется.
+        Повторно тот же чек не засчитывается.
+      operationId: scan_receipt_api_v1_receipts_scan_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_scan_receipt_api_v1_receipts_scan_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Файл больше 5 МБ
+      security:
+      - OAuth2PasswordBearer: []
 components:
   schemas:
     AuditLogOut:
@@ -1848,6 +1886,16 @@ components:
           title: File
       type: object
       title: Body_put_receipt_api_v1_payment_occurrences__occurrence_id__receipt_put
+    Body_scan_receipt_api_v1_receipts_scan_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_scan_receipt_api_v1_receipts_scan_post
     Body_token_api_v1_auth_token_post:
       properties:
         grant_type:
@@ -2204,6 +2252,24 @@ components:
       required:
       - error
       title: ErrorResponse
+    FiscalOut:
+      properties:
+        date:
+          type: string
+          format: date
+          title: Date
+        amount:
+          type: string
+          title: Amount
+        operation:
+          type: integer
+          title: Operation
+      type: object
+      required:
+      - date
+      - amount
+      - operation
+      title: FiscalOut
     HTTPValidationError:
       properties:
         detail:
@@ -2698,6 +2764,34 @@ components:
       - admin
       - user
       title: Role
+    ScanOut:
+      properties:
+        status:
+          type: string
+          enum:
+          - matched
+          - already_counted
+          - no_match
+          - not_receipt
+          title: Status
+        message:
+          type: string
+          title: Message
+        receipt:
+          anyOf:
+          - $ref: '#/components/schemas/FiscalOut'
+          - type: 'null'
+        occurrence:
+          anyOf:
+          - $ref: '#/components/schemas/OccurrenceOut'
+          - type: 'null'
+      type: object
+      required:
+      - status
+      - message
+      - receipt
+      - occurrence
+      title: ScanOut
     SummaryOut:
       properties:
         as_of:
