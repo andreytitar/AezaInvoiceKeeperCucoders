@@ -18,7 +18,7 @@ from app.domain.ics import CalendarEvent, build_ics
 from app.domain.money import format_amount
 from app.domain.schedule import strategy_for
 from app.domain.status import compute_overdue
-from app.models import PaymentOccurrence, User
+from app.models import PaymentOccurrence, RecurringPayment, User
 from app.repositories.payments import PaymentRepository
 
 HORIZON_DAYS = 365
@@ -42,11 +42,16 @@ class CalendarFeedService:
             raise NotFound("Календарь не найден")
         return user
 
-    def render(self, tz: str) -> str:
+    def render(self, user: User, tz: str) -> str:
         today = self.clock.today()
         events: list[CalendarEvent] = []
         occ = self.db.scalars(
-            select(PaymentOccurrence).where(PaymentOccurrence.due_date >= today - timedelta(days=PAID_HISTORY_DAYS))
+            select(PaymentOccurrence).where(
+                PaymentOccurrence.due_date >= today - timedelta(days=PAID_HISTORY_DAYS),
+                PaymentOccurrence.recurring_payment_id.in_(
+                    select(RecurringPayment.id).where(RecurringPayment.team_id == user.team_id)
+                ),
+            )
         ).all()
         occ = [o for o in occ if not o.is_paid or (o.paid_date and o.paid_date >= today - timedelta(days=PAID_HISTORY_DAYS))]
         known: dict = {}
@@ -68,7 +73,7 @@ class CalendarFeedService:
             )
         # прогноз на год вперёд
         horizon = today + timedelta(days=HORIZON_DAYS)
-        for p in PaymentRepository(self.db).list_alive():
+        for p in PaymentRepository(self.db).list_alive(user.team_id):
             strategy = strategy_for(p.recurrence)
             have = known.get(p.id, set())
             for i in range(0, 600):

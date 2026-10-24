@@ -66,17 +66,25 @@ class BudgetService:
         self.clock = clock
         self.repo = BudgetRepository(db)
 
-    def list(self, period_type=None, year=None, month=None) -> list[Budget]:
-        return self.repo.list(period_type, year, month)
+    def list(self, period_type=None, year=None, month=None, team_id=None) -> list[Budget]:
+        return self.repo.list(period_type, year, month, team_id=team_id)
 
     def upsert(self, *, period_type: BudgetPeriod, year: int, month: int | None, currency: Currency,
                planned_amount: Decimal, actor: User | None) -> tuple[Budget, bool]:
         period_bounds(period_type, year, month)
-        b = self.repo.find(period_type, year, month, currency)
+        team_id = actor.team_id if actor is not None else None
+        b = self.repo.find(period_type, year, month, currency, team_id=team_id)
         created = b is None
         before = None if created else _snap(b)
         if created:
-            b = Budget(period_type=period_type, year=year, month=month, currency=currency, planned_amount=planned_amount)
+            b = Budget(
+                team_id=team_id,
+                period_type=period_type,
+                year=year,
+                month=month,
+                currency=currency,
+                planned_amount=planned_amount,
+            )
             self.db.add(b)
         else:
             b.planned_amount = planned_amount
@@ -90,17 +98,21 @@ class BudgetService:
 
     def delete(self, budget_id: uuid.UUID, actor: User | None) -> None:
         b = self.repo.get(budget_id)
-        if b is None:
+        if b is None or (actor is not None and b.team_id != actor.team_id):
             raise NotFound("Бюджет не найден")
         AuditService(self.db, self.clock).log("budget.delete", entity_type="budget", entity_id=b.id, before=_snap(b), actor=actor)
         self.db.delete(b)
         self.db.commit()
 
-    def report(self, period_type: BudgetPeriod, year: int, month: int | None) -> BudgetReport:
+    def report(self, period_type: BudgetPeriod, year: int, month: int | None, team_id: uuid.UUID | None = None) -> BudgetReport:
         start, end = period_bounds(period_type, year, month)
-        budgets = {b.currency: b.planned_amount for b in self.repo.list(period_type, year, month) if b.month == month}
+        budgets = {
+            b.currency: b.planned_amount
+            for b in self.repo.list(period_type, year, month, team_id=team_id)
+            if b.month == month
+        }
         lines = []
-        occ = self.repo.occurrences_due_between(start, end)
+        occ = self.repo.occurrences_due_between(start, end, team_id=team_id)
         for cur in Currency:
             items = [o for o in occ if o.currency_snapshot == cur]
             scheduled = sum((o.amount_snapshot for o in items), ZERO)

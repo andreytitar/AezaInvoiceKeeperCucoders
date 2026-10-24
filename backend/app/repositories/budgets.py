@@ -13,8 +13,16 @@ class BudgetRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def list(self, period_type: BudgetPeriod | None, year: int | None, month: int | None) -> list[Budget]:
+    def list(
+        self,
+        period_type: BudgetPeriod | None,
+        year: int | None,
+        month: int | None,
+        team_id: uuid.UUID | None = None,
+    ) -> list[Budget]:
         stmt = select(Budget)
+        if team_id is not None:
+            stmt = stmt.where(Budget.team_id == team_id)
         if period_type:
             stmt = stmt.where(Budget.period_type == period_type)
         if year:
@@ -23,19 +31,26 @@ class BudgetRepository:
             stmt = stmt.where(Budget.month == month)
         return list(self.db.scalars(stmt.order_by(Budget.year, Budget.month.nulls_first(), Budget.currency)))
 
-    def find(self, period_type: BudgetPeriod, year: int, month: int | None, currency) -> Budget | None:
+    def find(self, period_type: BudgetPeriod, year: int, month: int | None, currency, team_id: uuid.UUID | None = None) -> Budget | None:
         stmt = select(Budget).where(
             Budget.period_type == period_type, Budget.year == year, Budget.currency == currency
         )
+        if team_id is not None:
+            stmt = stmt.where(Budget.team_id == team_id)
         stmt = stmt.where(Budget.month.is_(None)) if month is None else stmt.where(Budget.month == month)
         return self.db.scalar(stmt.with_for_update())
 
     def get(self, budget_id: uuid.UUID) -> Budget | None:
         return self.db.get(Budget, budget_id)
 
-    def occurrences_due_between(self, start: date, end: date) -> list[PaymentOccurrence]:
-        return list(
-            self.db.scalars(
-                select(PaymentOccurrence).where(PaymentOccurrence.due_date >= start, PaymentOccurrence.due_date <= end)
+    def occurrences_due_between(self, start: date, end: date, team_id: uuid.UUID | None = None) -> list[PaymentOccurrence]:
+        stmt = select(PaymentOccurrence).where(PaymentOccurrence.due_date >= start, PaymentOccurrence.due_date <= end)
+        if team_id is not None:
+            from app.models import RecurringPayment
+
+            stmt = stmt.where(
+                PaymentOccurrence.recurring_payment_id.in_(
+                    select(RecurringPayment.id).where(RecurringPayment.team_id == team_id)
+                )
             )
-        )
+        return list(self.db.scalars(stmt))

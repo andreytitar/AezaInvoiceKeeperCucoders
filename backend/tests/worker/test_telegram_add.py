@@ -22,7 +22,7 @@ def test_admin_adds_payment_by_phrase_and_undoes(admin, container, fake_channel)
     run(container, msg(cmd, chat_id=777, tg_id=777, chat_type="private"))
     c = run(container, msg("/add сервер aeza 25$ 26 числа", chat_id=777, tg_id=777, chat_type="private"))
     text = c.messages[0]["text"]
-    assert "Сервер aeza" in text and "25,00 $" in text and "26.10.2026" in text
+    assert "Сервер aeza" in text and "25,00\u00a0$\u00a0(USD)" in text and "26.10.2026" in text
     payments = admin.get("/api/v1/recurring-payments").json()
     assert [(p["title"], p["amount"], p["currency"]) for p in payments] == [("Сервер aeza", "25.00", "USD")]
     assert len(fake_channel.sent) == 1  # срок через 2 дня — напоминание сразу

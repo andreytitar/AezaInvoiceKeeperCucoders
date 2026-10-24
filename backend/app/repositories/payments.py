@@ -16,30 +16,35 @@ class PaymentRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def get(self, payment_id: uuid.UUID, include_deleted: bool = False) -> RecurringPayment | None:
+    def get(self, payment_id: uuid.UUID, include_deleted: bool = False, team_id: uuid.UUID | None = None) -> RecurringPayment | None:
         stmt = select(RecurringPayment).where(RecurringPayment.id == payment_id)
         if not include_deleted:
             stmt = stmt.where(RecurringPayment.deleted_at.is_(None))
+        if team_id is not None:
+            stmt = stmt.where(RecurringPayment.team_id == team_id)
         return self.db.scalar(stmt)
 
-    def list(self, include_deleted: bool = False) -> list[RecurringPayment]:
+    def list(self, include_deleted: bool = False, team_id: uuid.UUID | None = None) -> list[RecurringPayment]:
         stmt = select(RecurringPayment).order_by(RecurringPayment.created_at, RecurringPayment.title)
         if not include_deleted:
             stmt = stmt.where(RecurringPayment.deleted_at.is_(None))
+        if team_id is not None:
+            stmt = stmt.where(RecurringPayment.team_id == team_id)
         return list(self.db.scalars(stmt))
 
-    def list_alive(self) -> list[RecurringPayment]:
-        return self.list(include_deleted=False)
+    def list_alive(self, team_id: uuid.UUID | None = None) -> list[RecurringPayment]:
+        return self.list(include_deleted=False, team_id=team_id)
 
     def add(self, payment: RecurringPayment) -> RecurringPayment:
         self.db.add(payment)
         self.db.flush()
         return payment
 
-    def find_by_title(self, title: str) -> RecurringPayment | None:
-        return self.db.scalar(
-            select(RecurringPayment).where(RecurringPayment.title == title, RecurringPayment.deleted_at.is_(None))
-        )
+    def find_by_title(self, title: str, team_id: uuid.UUID | None = None) -> RecurringPayment | None:
+        stmt = select(RecurringPayment).where(RecurringPayment.title == title, RecurringPayment.deleted_at.is_(None))
+        if team_id is not None:
+            stmt = stmt.where(RecurringPayment.team_id == team_id)
+        return self.db.scalar(stmt)
 
 
 @dataclass
@@ -51,6 +56,7 @@ class OccurrenceFilter:
     date_to: date | None = None
     recurring_payment_id: uuid.UUID | None = None
     search: str | None = None
+    team_id: uuid.UUID | None = None
 
 
 SORTS = {
@@ -168,6 +174,12 @@ class OccurrenceRepository:
         if f.search:
             pattern = f.search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             stmt = stmt.where(PaymentOccurrence.title_snapshot.ilike(f"%{pattern}%", escape="\\"))
+        if f.team_id is not None:
+            stmt = stmt.where(
+                PaymentOccurrence.recurring_payment_id.in_(
+                    select(RecurringPayment.id).where(RecurringPayment.team_id == f.team_id)
+                )
+            )
         return stmt
 
     def query(

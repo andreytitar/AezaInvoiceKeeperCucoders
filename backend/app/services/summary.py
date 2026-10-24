@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
@@ -91,13 +92,15 @@ class SummaryService:
         items = self.occurrences.all_filtered(f or OccurrenceFilter(), today)
         return Summary(as_of=as_of, currencies=_accumulate(items, as_of))
 
-    def calendar(self, date_from: date, date_to: date) -> list[CalendarDay]:
+    def calendar(self, date_from: date, date_to: date, team_id: uuid.UUID | None = None) -> list[CalendarDay]:
         if date_to < date_from:
             raise ValidationError("Дата «по» раньше даты «с»", details={"field": "to"})
         if (date_to - date_from).days > MAX_CALENDAR_DAYS:
             raise ValidationError(f"Диапазон календаря не больше {MAX_CALENDAR_DAYS} дней", details={"field": "to"})
         today = self.clock.today()
-        items = self.occurrences.all_filtered(OccurrenceFilter(date_from=date_from, date_to=date_to), today)
+        items = self.occurrences.all_filtered(
+            OccurrenceFilter(date_from=date_from, date_to=date_to, team_id=team_id), today
+        )
         by_day: dict[date, list[PaymentOccurrence]] = defaultdict(list)
         for o in sorted(items, key=lambda x: (x.due_date, x.title_snapshot)):
             by_day[o.due_date].append(o)

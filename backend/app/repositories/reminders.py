@@ -14,7 +14,9 @@ class ReminderRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def candidates(self, window_end: date, payment_id: uuid.UUID | None = None) -> list[PaymentOccurrence]:
+    def candidates(
+        self, window_end: date, payment_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
+    ) -> list[PaymentOccurrence]:
         """Неоплаченные периоды живых платежей со сроком <= window_end (включая просроченные)."""
         stmt = (
             select(PaymentOccurrence)
@@ -27,6 +29,8 @@ class ReminderRepository:
         )
         if payment_id:
             stmt = stmt.where(PaymentOccurrence.recurring_payment_id == payment_id)
+        if team_id is not None:
+            stmt = stmt.where(RecurringPayment.team_id == team_id)
         return list(self.db.scalars(stmt))
 
     def enqueue(self, occurrence_id: uuid.UUID, channel: str, recipient: str, kind: str, now: datetime) -> bool:

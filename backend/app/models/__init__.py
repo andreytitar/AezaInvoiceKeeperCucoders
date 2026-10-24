@@ -38,6 +38,11 @@ class Role(StrEnum):
     USER = "user"
 
 
+class TeamKind(StrEnum):
+    PRIMARY = "primary"
+    SANDBOX = "sandbox"
+
+
 class BudgetPeriod(StrEnum):
     MONTH = "month"
     YEAR = "year"
@@ -71,6 +76,36 @@ class TimestampMixin:
     )
 
 
+class Team(TimestampMixin, Base):
+    """Команда: одна основная (primary) и временные песочницы из бота (sandbox, 24 часа)."""
+
+    __tablename__ = "teams"
+    __table_args__ = (
+        Index("uq_teams_one_primary", "kind", unique=True, postgresql_where=text("kind = 'primary'")),
+        Index(
+            "uq_teams_chat",
+            "telegram_chat_id",
+            unique=True,
+            postgresql_where=text("telegram_chat_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_teams_invite",
+            "invite_code",
+            unique=True,
+            postgresql_where=text("invite_code IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind: Mapped[TeamKind] = mapped_column(_enum(TeamKind, "team_kind"))
+    name: Mapped[str] = mapped_column(String(120))
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    telegram_chat_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    chat_bound_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    invite_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
 class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -85,6 +120,7 @@ class User(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     login: Mapped[str] = mapped_column(String(64))
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[Role] = mapped_column(_enum(Role, "user_role"), default=Role.USER)
@@ -93,6 +129,8 @@ class User(TimestampMixin, Base):
     telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     calendar_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    team: Mapped[Team] = relationship(lazy="joined")
 
 
 class Session(Base):
@@ -117,6 +155,7 @@ class RecurringPayment(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))
     currency: Mapped[Currency] = mapped_column(_enum(Currency, "currency"))
@@ -216,6 +255,7 @@ class AuditLog(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
     seq: Mapped[int] = mapped_column(BigInteger, Identity(always=True), unique=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -267,8 +307,11 @@ class Budget(TimestampMixin, Base):
 
     __tablename__ = "budgets"
     __table_args__ = (
-        UniqueConstraint("period_type", "year", "month", "currency", name="uq_budget_period_currency",
-                         postgresql_nulls_not_distinct=True),
+        UniqueConstraint(
+            "team_id", "period_type", "year", "month", "currency",
+            name="uq_budget_period_currency",
+            postgresql_nulls_not_distinct=True,
+        ),
         CheckConstraint(
             "(period_type = 'month' AND month BETWEEN 1 AND 12) OR (period_type = 'year' AND month IS NULL)",
             name="ck_budget_month",
@@ -277,6 +320,7 @@ class Budget(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     period_type: Mapped[BudgetPeriod] = mapped_column(_enum(BudgetPeriod, "budget_period"))
     year: Mapped[int] = mapped_column(SmallInteger)
     month: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
@@ -290,6 +334,7 @@ class WebhookEndpoint(TimestampMixin, Base):
     __tablename__ = "webhook_endpoints"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     url: Mapped[str] = mapped_column(String(2000))
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -308,3 +353,13 @@ class TelegramLinkCode(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TelegramPending(Base):
+    """Короткое состояние диалога в личке (например, ждём код приглашения)."""
+
+    __tablename__ = "telegram_pending"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    action: Mapped[str] = mapped_column(String(32))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

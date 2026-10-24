@@ -68,6 +68,19 @@ export function Layout() {
         </div>
       </header>
       <TelegramDialog open={tg} onClose={() => setTg(false)} />
+      {me?.team?.kind === 'sandbox' && (
+        <div className="border-b border-red/40 bg-red/10" role="status">
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm">
+            Временная команда. Данные удалятся{' '}
+            <b className="num">
+              {me.team.expires_at
+                ? new Date(me.team.expires_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : 'через 24 часа'}
+            </b>
+            . Попробуйте платёж, отметку оплаты, пользователей и привязку группы в «Telegram».
+          </p>
+        </div>
+      )}
       <main id="main" className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

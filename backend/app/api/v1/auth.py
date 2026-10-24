@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import SESSION_COOKIE, AuthDep, ContainerDep, DbDep, client_ip
@@ -36,7 +37,7 @@ def _set_cookie(response: Response, token: str, c) -> None:
 def login(body: LoginRequest, request: Request, response: Response, c: ContainerDep, db: DbDep) -> LoginResponse:
     result = AuthService(db, c.clock, c.settings, c.rate_limiter).login(body.login, body.password, client_ip(request))
     _set_cookie(response, result.token, c)
-    return LoginResponse(access_token=result.token, user=MeOut.model_validate(result.user))
+    return LoginResponse(access_token=result.token, user=MeOut.from_user(result.user))
 
 
 @router.post(
@@ -54,7 +55,20 @@ def token(
 
 @router.get("/me", response_model=MeOut, summary="Текущий пользователь", responses=responses(401))
 def me(auth: AuthDep) -> MeOut:
-    return MeOut.model_validate(auth.user)
+    return MeOut.from_user(auth.user)
+
+
+@router.get(
+    "/magic/{code}",
+    summary="Вход по одноразовой ссылке из бота",
+    description="Ставит ту же HttpOnly-сессию, что и обычный вход, и перенаправляет в панель. Ссылка сгорает после первого открытия.",
+    responses=responses(422),
+)
+def magic_login(code: str, c: ContainerDep, db: DbDep) -> RedirectResponse:
+    result = AuthService(db, c.clock, c.settings).login_magic(code)
+    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    _set_cookie(response, result.token, c)
+    return response
 
 
 @router.post(

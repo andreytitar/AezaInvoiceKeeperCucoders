@@ -21,7 +21,7 @@ from app.domain.money import Currency, format_amount
 from app.domain.status import PaymentStatus
 from app.infrastructure.qr_reader import read_qr_codes
 from app.infrastructure.storage import sniff
-from app.models import PaymentOccurrence, Receipt, User
+from app.models import PaymentOccurrence, Receipt, RecurringPayment, User
 from app.services.occurrences import OccurrenceService
 from app.services.receipts import PayloadTooLarge, ReceiptService
 
@@ -42,16 +42,21 @@ class ReceiptScanService:
         self.clock = clock
         self.settings = settings
 
-    def _find(self, r: FiscalReceipt) -> PaymentOccurrence | None:
-        candidates = self.db.scalars(
-            select(PaymentOccurrence).where(
-                PaymentOccurrence.is_paid.is_(False),
-                PaymentOccurrence.currency_snapshot == Currency.RUB,
-                PaymentOccurrence.amount_snapshot == r.amount,
-                PaymentOccurrence.due_date >= r.day - MATCH_WINDOW,
-                PaymentOccurrence.due_date <= r.day + MATCH_WINDOW,
+    def _find(self, r: FiscalReceipt, team_id) -> PaymentOccurrence | None:
+        stmt = select(PaymentOccurrence).where(
+            PaymentOccurrence.is_paid.is_(False),
+            PaymentOccurrence.currency_snapshot == Currency.RUB,
+            PaymentOccurrence.amount_snapshot == r.amount,
+            PaymentOccurrence.due_date >= r.day - MATCH_WINDOW,
+            PaymentOccurrence.due_date <= r.day + MATCH_WINDOW,
+        )
+        if team_id is not None:
+            stmt = stmt.where(
+                PaymentOccurrence.recurring_payment_id.in_(
+                    select(RecurringPayment.id).where(RecurringPayment.team_id == team_id)
+                )
             )
-        ).all()
+        candidates = self.db.scalars(stmt).all()
         if not candidates:
             return None
         return min(candidates, key=lambda o: (abs((o.due_date - r.day).days), o.due_date))
@@ -68,11 +73,23 @@ class ReceiptScanService:
         amount = format_amount(r.amount, Currency.RUB)
         if not r.is_payment:
             return ScanResult("no_match", f"Это чек «{OPERATION_NAMES.get(r.operation, r.operation)}», а не оплата.", r)
-        dup = self.db.scalar(select(Receipt).where(Receipt.fiscal_sign == r.fingerprint))
+        team_id = actor.team_id if actor is not None else None
+        dup_stmt = select(Receipt).where(Receipt.fiscal_sign == r.fingerprint)
+        if team_id is not None:
+            dup_stmt = dup_stmt.where(
+                Receipt.occurrence_id.in_(
+                    select(PaymentOccurrence.id).where(
+                        PaymentOccurrence.recurring_payment_id.in_(
+                            select(RecurringPayment.id).where(RecurringPayment.team_id == team_id)
+                        )
+                    )
+                )
+            )
+        dup = self.db.scalar(dup_stmt)
         if dup is not None:
             occ = self.db.get(PaymentOccurrence, dup.occurrence_id)
             return ScanResult("already_counted", f"Этот чек уже учтён: «{occ.title_snapshot}», срок {occ.due_date:%d.%m.%Y}.", r, occ)
-        occ = self._find(r)
+        occ = self._find(r, team_id)
         if occ is None:
             return ScanResult(
                 "no_match",

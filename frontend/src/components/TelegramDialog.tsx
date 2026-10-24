@@ -27,7 +27,7 @@ function CopyLine({ text }: { text: string }) {
 /** Привязка Telegram без ввода id: ссылка для пользователя и /bind для чата напоминаний. */
 export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
-  const { isAdmin } = useAuth()
+  const { isAdmin, me } = useAuth()
   const toast = useToast()
   const [status, setStatus] = useState<Status | null>(null)
   const [myCode, setMyCode] = useState<Code | null>(null)
@@ -114,8 +114,10 @@ export function TelegramDialog({ open, onClose }: { open: boolean; onClose: () =
                 <p className="text-xs text-ink-soft">Сюда приходят напоминания и сводка по понедельникам в 9:00.</p>
                 <p className="text-sm mt-1">
                   {status.chat_bound
-                    ? <>Сейчас: <b>{status.chat_title ?? 'чат из .env'}</b>{status.chat_source === 'env' && ' (TELEGRAM_CHAT_ID)'}.</>
-                    : 'Чат не подключён — напоминаниям некуда приходить.'}
+                    ? <>Сейчас: <b>{status.chat_title ?? (status.chat_source === 'env' ? 'чат из .env' : 'группа')}</b>{status.chat_source === 'env' && ' (TELEGRAM_CHAT_ID)'}.</>
+                    : me?.team?.kind === 'sandbox'
+                      ? 'Группа не привязана — напоминания приходят администратору в личку.'
+                      : 'Чат не подключён — напоминаниям некуда приходить.'}
                 </p>
                 {!chatCode ? (
                   <span className="flex flex-wrap gap-2 mt-2">

@@ -49,9 +49,9 @@ def rotate_feed(request: Request, user: UserDep, c: ContainerDep, db: DbDep) -> 
 )
 def ics(token: str, c: ContainerDep, db: DbDep) -> Response:
     svc = CalendarFeedService(db, c.clock)
-    svc.user_by_token(token)
+    owner = svc.user_by_token(token)
     return Response(
-        content=svc.render(c.settings.app_timezone),
+        content=svc.render(owner, c.settings.app_timezone),
         media_type="text/calendar; charset=utf-8",
         headers={"Cache-Control": "private, max-age=300", "Content-Disposition": 'inline; filename="invoice-keeper.ics"'},
     )

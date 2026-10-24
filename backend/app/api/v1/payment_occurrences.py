@@ -19,7 +19,7 @@ router = APIRouter(prefix="/payment-occurrences", tags=["payment-occurrences"])
 
 @router.get("", response_model=OccurrencePage, summary="Периоды платежей с фильтрами", responses=responses(401, 422))
 def list_occurrences(
-    _: UserDep,
+    user: UserDep,
     c: ContainerDep,
     db: DbDep,
     status: PaymentStatus | None = Query(None, description="paid | unpaid"),
@@ -41,6 +41,7 @@ def list_occurrences(
         date_to=to,
         recurring_payment_id=recurring_payment_id,
         search=q or None,
+        team_id=user.team_id,
     )
     result = OccurrenceService(db, c.clock, c.settings).list(f, sort, page, page_size)
     today = c.clock.today()
@@ -53,8 +54,10 @@ def list_occurrences(
 
 
 @router.get("/{occurrence_id}", response_model=OccurrenceOut, summary="Период", responses=responses(401, 404))
-def get_occurrence(occurrence_id: uuid.UUID, _: UserDep, c: ContainerDep, db: DbDep) -> OccurrenceOut:
-    return OccurrenceOut.build(OccurrenceService(db, c.clock, c.settings).get(occurrence_id), c.clock.today())
+def get_occurrence(occurrence_id: uuid.UUID, user: UserDep, c: ContainerDep, db: DbDep) -> OccurrenceOut:
+    return OccurrenceOut.build(
+        OccurrenceService(db, c.clock, c.settings).get(occurrence_id, team_id=user.team_id), c.clock.today()
+    )
 
 
 @router.patch(

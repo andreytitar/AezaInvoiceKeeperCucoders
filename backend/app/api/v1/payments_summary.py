@@ -37,14 +37,16 @@ def _currency(cs: CurrencySummary) -> CurrencySummaryOut:
     responses=responses(401, 422),
 )
 def summary(
-    _: UserDep,
+    user: UserDep,
     c: ContainerDep,
     db: DbDep,
     from_: date | None = Query(None, alias="from", description="Срок периода не раньше"),
     to: date | None = Query(None, description="Срок периода не позже"),
     as_of: date | None = Query(None, description="Итоги на дату (YYYY-MM-DD)"),
 ) -> SummaryOut:
-    s = SummaryService(db, c.clock).summary(OccurrenceFilter(date_from=from_, date_to=to), as_of=as_of)
+    s = SummaryService(db, c.clock).summary(
+        OccurrenceFilter(date_from=from_, date_to=to, team_id=user.team_id), as_of=as_of
+    )
     return SummaryOut(as_of=s.as_of, currencies=[_currency(cs) for cs in s.currencies])
 
 
@@ -56,14 +58,14 @@ def summary(
     responses=responses(401, 422),
 )
 def calendar(
-    _: UserDep,
+    user: UserDep,
     c: ContainerDep,
     db: DbDep,
     from_: date = Query(..., alias="from"),
     to: date = Query(...),
 ) -> CalendarOut:
     today = c.clock.today()
-    days = SummaryService(db, c.clock).calendar(from_, to)
+    days = SummaryService(db, c.clock).calendar(from_, to, team_id=user.team_id)
     return CalendarOut(
         date_from=from_,
         to=to,

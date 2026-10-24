@@ -66,6 +66,7 @@ def test_linked_user_marks_paid_and_message_is_edited(admin, user, regular_user,
     assert client.answers == [("cq1", "Отмечено как оплачено", False)]
     chat, mid, text = client.edits[0]
     assert (chat, mid) == (-100500, 77) and "Оплачено" in text and "ivan" in text and "24.10.2026" in text
+    assert "<b>55\u00a0000,00\u00a0₽</b>\u00a0(RUB)" in text and "55 000" not in text
     log = admin.get("/api/v1/audit-logs", params={"action": "occurrence.paid"}).json()["items"][0]
     assert log["actor_login"] == "ivan" and log["user_agent"] == "telegram-bot"
 

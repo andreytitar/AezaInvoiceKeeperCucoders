@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import Field
 
-from app.models import Role
+from app.models import Role, TeamKind, User
 from app.schemas.common import InputModel, OutputModel
 
 Login = Annotated[str, Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_.\-]+$", examples=["ivan"])]
@@ -24,8 +24,39 @@ class UserOut(OutputModel):
     created_at: datetime
 
 
+class TeamOut(OutputModel):
+    id: uuid.UUID
+    kind: TeamKind
+    name: str
+    expires_at: datetime | None
+    chat_bound: bool
+    chat_title: str | None
+
+
 class MeOut(UserOut):
     is_system: bool
+    team: TeamOut
+
+    @classmethod
+    def from_user(cls, user: User) -> "MeOut":
+        team = user.team
+        return cls(
+            id=user.id,
+            login=user.login,
+            role=user.role,
+            email=user.email,
+            telegram_user_id=user.telegram_user_id,
+            created_at=user.created_at,
+            is_system=user.is_system,
+            team=TeamOut(
+                id=team.id,
+                kind=team.kind,
+                name=team.name,
+                expires_at=team.expires_at,
+                chat_bound=team.telegram_chat_id is not None,
+                chat_title=team.telegram_chat_title,
+            ),
+        )
 
 
 class UserCreate(InputModel):

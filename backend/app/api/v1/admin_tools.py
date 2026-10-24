@@ -34,7 +34,7 @@ class DigestResult(BaseModel):
     responses=responses(401, 403),
 )
 async def send_digest_now(admin: AdminDep, c: ContainerDep) -> DigestResult:
-    sent = await send_weekly_digest(c, force=True)
+    sent = await send_weekly_digest(c, force=True, team_id=admin.team_id)
     with c.session_factory() as db:
         AuditService(db, c.clock).log("admin.send_digest", after={"sent": sent}, actor=admin)
         db.commit()
@@ -49,7 +49,7 @@ async def send_digest_now(admin: AdminDep, c: ContainerDep) -> DigestResult:
     responses=responses(401, 403),
 )
 async def run_checks_now(admin: AdminDep, c: ContainerDep) -> CheckResult:
-    stats = await run_checks(c)
+    stats = await run_checks(c, team_id=admin.team_id)
     with c.session_factory() as db:
         AuditService(db, c.clock).log("admin.run_checks", after=stats.as_dict(), actor=admin)
         db.commit()

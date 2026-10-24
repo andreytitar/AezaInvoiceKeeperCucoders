@@ -26,24 +26,20 @@ class UserRepository:
             select(User).where(User.telegram_user_id == telegram_user_id, User.deleted_at.is_(None))
         )
 
-    def list_regular(self) -> list[User]:
-        return list(
-            self.db.scalars(
-                select(User).where(User.deleted_at.is_(None), User.is_system.is_(False)).order_by(User.login)
-            )
-        )
+    def list_regular(self, team_id: uuid.UUID | None = None) -> list[User]:
+        stmt = select(User).where(User.deleted_at.is_(None), User.is_system.is_(False))
+        if team_id is not None:
+            stmt = stmt.where(User.team_id == team_id)
+        return list(self.db.scalars(stmt.order_by(User.login)))
 
     def list_system(self) -> list[User]:
         return list(self.db.scalars(select(User).where(User.is_system.is_(True), User.deleted_at.is_(None))))
 
-    def active_emails(self) -> list[str]:
-        return [
-            e
-            for e in self.db.scalars(
-                select(User.email).where(User.deleted_at.is_(None), User.email.is_not(None)).order_by(User.login)
-            )
-            if e
-        ]
+    def active_emails(self, team_id: uuid.UUID | None = None) -> list[str]:
+        stmt = select(User.email).where(User.deleted_at.is_(None), User.email.is_not(None))
+        if team_id is not None:
+            stmt = stmt.where(User.team_id == team_id)
+        return [e for e in self.db.scalars(stmt.order_by(User.login)) if e]
 
     def add(self, user: User) -> User:
         self.db.add(user)

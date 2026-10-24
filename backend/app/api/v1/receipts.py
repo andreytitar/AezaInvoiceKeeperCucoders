@@ -16,8 +16,8 @@ router = APIRouter(prefix="/payment-occurrences/{occurrence_id}/receipt", tags=[
 
 
 @router.get("", response_model=ReceiptOut, summary="Чек периода", responses=responses(401, 404))
-def get_receipt(occurrence_id: uuid.UUID, _: UserDep, c: ContainerDep, db: DbDep) -> ReceiptOut:
-    return ReceiptOut.build(ReceiptService(db, c.clock, c.settings).get(occurrence_id))
+def get_receipt(occurrence_id: uuid.UUID, user: UserDep, c: ContainerDep, db: DbDep) -> ReceiptOut:
+    return ReceiptOut.build(ReceiptService(db, c.clock, c.settings).get(occurrence_id, user.team_id))
 
 
 @router.put(
@@ -61,8 +61,8 @@ def delete_receipt(occurrence_id: uuid.UUID, user: UserDep, c: ContainerDep, db:
     response_class=FileResponse,
     responses={**responses(401, 404), 200: {"content": {"application/pdf": {}, "image/png": {}, "image/jpeg": {}}}},
 )
-def download_receipt(occurrence_id: uuid.UUID, _: UserDep, c: ContainerDep, db: DbDep) -> FileResponse:
-    path, r = ReceiptService(db, c.clock, c.settings).file(occurrence_id)
+def download_receipt(occurrence_id: uuid.UUID, user: UserDep, c: ContainerDep, db: DbDep) -> FileResponse:
+    path, r = ReceiptService(db, c.clock, c.settings).file(occurrence_id, user.team_id)
     return FileResponse(
         path,
         media_type=r.mime,

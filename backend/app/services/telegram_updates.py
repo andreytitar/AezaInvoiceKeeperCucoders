@@ -14,11 +14,12 @@ import uuid
 from sqlalchemy.dialects.postgresql import insert
 
 from app.domain.errors import DomainError
-from app.domain.money import format_amount
+from app.domain.money import NBSP, format_amount
 from app.domain.status import PaymentStatus
 from app.infrastructure.channels.telegram import TelegramClient, TelegramError
 from app.infrastructure.request_context import RequestContext, request_context
-from app.models import TelegramUpdatesOffset
+from app.models import Role, TeamKind, TelegramPending, TelegramUpdatesOffset
+from app.repositories.teams import TeamRepository
 from app.repositories.users import UserRepository
 from app.domain.phrase import parse_payment_phrase
 from app.services.payments import PaymentService
@@ -26,13 +27,32 @@ from app.services.receipt_scan import ReceiptScanService
 from app.services.reminders import dispatch_now
 from app.services.bot_answers import HELP, BotAnswers, command_for_text
 from app.services.occurrences import OccurrenceService
-from app.services.telegram_link import TelegramLinkService, get_bound_chat
+from app.services.teams import TeamService
+from app.services.telegram_link import TelegramLinkService, magic_url
 
 log = logging.getLogger("app.telegram.updates")
 
 CALLBACK_PAID = "paid:"  # под напоминанием: сообщение редактируется
 CALLBACK_LIST_PAID = "lp:"
 CALLBACK_UNDO = "undo:"  # удалить платёж, только что добавленный через /add  # под ответом на /topay и т. п.: отдельное сообщение
+
+UNLINKED_MENU = {
+    "inline_keyboard": [
+        [{"text": "Создать временную команду", "callback_data": "sb:new"}],
+        [{"text": "Войти по коду приглашения", "callback_data": "sb:join"}],
+        [{"text": "Войти на сайте", "callback_data": "sb:site"}],
+    ]
+}
+UNLINKED_TEXT = (
+    "<b>Invoice Keeper</b>\n\n"
+    "Этот Telegram ещё не привязан к команде.\n"
+    "Можно открыть временную команду на 24 часа, войти по коду приглашения "
+    "или привязать уже существующий аккаунт с сайта."
+)
+SITE_TEXT = (
+    "Учётная запись должна уже существовать. Войдите на сайте, откройте «Telegram» → «Привязать Telegram» "
+    "и отправьте боту полученный код. Новый администратор основной команды так не создаётся."
+)
 
 
 def paid_callback(occurrence_id: uuid.UUID) -> str:
@@ -65,6 +85,9 @@ class TelegramUpdateHandler:
         if not cq:
             return
         data = cq.get("data") or ""
+        if data.startswith("sb:"):
+            await self._sandbox_callback(cq, data)
+            return
         if data.startswith(CALLBACK_UNDO):
             try:
                 await self._undo_add(cq, uuid.UUID(data[len(CALLBACK_UNDO):]))
@@ -100,7 +123,7 @@ class TelegramUpdateHandler:
             )
             try:
                 svc = OccurrenceService(db, self.c.clock, self.c.settings)
-                already_paid = svc.get(occurrence_id).is_paid
+                already_paid = svc.get(occurrence_id, user.team_id).is_paid
                 occ = svc.mark(
                     occurrence_id,
                     status=PaymentStatus.PAID,
@@ -116,7 +139,7 @@ class TelegramUpdateHandler:
             text = (
                 f"<b>Оплачено</b>\n\n"
                 f"<b>{html.escape(occ.title_snapshot)}</b>\n"
-                f"Сумма: <b>{html.escape(format_amount(occ.amount_snapshot, occ.currency_snapshot))}</b> "
+                f"Сумма: <b>{html.escape(format_amount(occ.amount_snapshot, occ.currency_snapshot))}</b>{NBSP}"
                 f"({occ.currency_snapshot.value})\n"
                 f"Срок: {occ.due_date:%d.%m.%Y}\n"
                 f"Оплачено {occ.paid_date:%d.%m.%Y}, отметил(а) {html.escape(user.login)}"
@@ -142,12 +165,18 @@ class TelegramUpdateHandler:
         except TelegramError as exc:
             log.warning("sendMessage: %s", exc)
 
-    def _access(self, db, chat_id: int, tg_id: int | None):
-        """Кто спрашивает: привязанный пользователь (в любом чате) или участник чата напоминаний."""
+    def _access(self, db, chat_id: int, tg_id: int | None, private: bool):
+        """Личка — только привязанный пользователь своей команды. Группа — чат, привязанный к команде.
+
+        Кнопка «Оплачено» сюда не смотрит: её проверяет принадлежность telegram id к команде периода.
+        """
         user = UserRepository(db).get_by_telegram_id(int(tg_id)) if tg_id else None
-        bound = get_bound_chat(db, self.c.settings).chat_id
-        in_bound_chat = bound is not None and str(chat_id) == str(bound)
-        return user, (user is not None or in_bound_chat)
+        if private:
+            return user, user is not None, (user.team_id if user else None)
+        team = TeamRepository(db).get_by_chat_id(int(chat_id))
+        if team is None:
+            return user, False, None
+        return user, True, team.id
 
     async def handle_message(self, msg: dict) -> None:
         chat = msg.get("chat") or {}
@@ -161,6 +190,9 @@ class TelegramUpdateHandler:
         if msg.get("photo") or msg.get("document"):
             if private:
                 await self._scan_receipt(msg, chat_id, tg_id)
+            return
+
+        if private and text and not text.startswith("/") and tg_id and await self._pending_invite(chat_id, int(tg_id), text):
             return
 
         if text.startswith("/"):
@@ -177,13 +209,15 @@ class TelegramUpdateHandler:
 
         if cmd == "start":
             await self._cmd_start(chat_id, tg_id, args, private)
+        elif cmd == "join":
+            await self._cmd_join(chat_id, tg_id, args, private)
         elif cmd == "bind":
-            await self._cmd_bind(chat_id, chat.get("title"), args, msg.get("message_id"))
+            await self._cmd_bind(chat_id, chat.get("title"), args, msg.get("message_id"), tg_id, private)
         elif cmd == "help":
             await self._send(chat_id, HELP)
         elif cmd in ("topay", "overdue", "week", "paid", "summary", "add"):
             with self.c.session_factory() as db:
-                user, allowed = self._access(db, chat_id, tg_id)
+                user, allowed, team_id = self._access(db, chat_id, tg_id, private)
                 if not allowed:
                     await self._send(
                         chat_id,
@@ -192,13 +226,13 @@ class TelegramUpdateHandler:
                     )
                     return
                 if cmd == "add":
-                    await self._cmd_add(db, user, chat_id, args, msg.get("message_id"))
+                    await self._cmd_add(db, user, chat_id, args, msg.get("message_id"), team_id)
                     return
-                answer = getattr(BotAnswers(db, self.c.clock), cmd)()
+                answer = getattr(BotAnswers(db, self.c.clock, team_id), cmd)()
             await self._send(chat_id, answer.text, answer.reply_markup())
 
-    async def _cmd_add(self, db, user, chat_id, text: str, reply_to) -> None:
-        if user is None or user.role != "admin":
+    async def _cmd_add(self, db, user, chat_id, text: str, reply_to, team_id) -> None:
+        if user is None or user.role != Role.ADMIN or user.team_id != team_id:
             await self._send(chat_id, "Добавлять платежи может только администратор с привязанным Telegram.", reply_to=reply_to)
             return
         if not text:
@@ -224,7 +258,7 @@ class TelegramUpdateHandler:
         await self._send(
             chat_id,
             "Добавлен платёж:\n"
-            f"<b>{html.escape(payment.title)}</b> — {html.escape(format_amount(payment.amount, payment.currency))} "
+            f"<b>{html.escape(payment.title)}</b> — {html.escape(format_amount(payment.amount, payment.currency))}{NBSP}"
             f"({payment.currency.value}), {rec[payment.recurrence.value]}, ближайшая оплата "
             f"{payment.first_due_date:%d.%m.%Y}.",
             reply_markup={"inline_keyboard": [[{"text": "Удалить этот платёж", "callback_data": f"{CALLBACK_UNDO}{payment.id}"}]]},
@@ -236,7 +270,7 @@ class TelegramUpdateHandler:
         tg_id = (cq.get("from") or {}).get("id")
         with self.c.session_factory() as db:
             user = UserRepository(db).get_by_telegram_id(int(tg_id)) if tg_id else None
-            if user is None or user.role != "admin":
+            if user is None or user.role != Role.ADMIN:
                 await self._answer(cq, "Удалять платежи может только администратор", alert=True)
                 return
             try:
@@ -289,40 +323,214 @@ class TelegramUpdateHandler:
         await self._send(chat_id, html.escape(result.message), reply_to=msg.get("message_id"))
 
     async def _cmd_start(self, chat_id, tg_id, code: str, private: bool) -> None:
-        if not code:
-            await self._send(chat_id, HELP)
-            return
         if not private or not tg_id:
             await self._send(chat_id, "Привязка аккаунта работает только в личке с ботом.")
             return
+        if code:
+            # Код с сайта привязывает уже существующего пользователя и не создаёт администратора.
+            with self.c.session_factory() as db:
+                try:
+                    user = TelegramLinkService(db, self.c.clock, self.c.settings).link_user(code, int(tg_id))
+                except DomainError as exc:
+                    await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}")
+                    return
+                login = user.login
+            await self._send(
+                chat_id,
+                f"Готово: этот Telegram привязан к пользователю <b>{html.escape(login)}</b>.\n"
+                "Теперь вы можете нажимать «Оплачено» под напоминаниями и спрашивать бота: /topay, /overdue, /summary.",
+            )
+            return
+        with self.c.session_factory() as db:
+            user = UserRepository(db).get_by_telegram_id(int(tg_id))
+            if user is None:
+                await self._send(chat_id, UNLINKED_TEXT, UNLINKED_MENU)
+                return
+            if user.team.kind == TeamKind.PRIMARY:
+                await self._send(chat_id, HELP)
+                return
+            await self._send_sandbox_home(db, chat_id, user)
+
+    async def _cmd_join(self, chat_id, tg_id, code: str, private: bool) -> None:
+        if not private or not tg_id:
+            await self._send(chat_id, "Код приглашения принимается только в личке с ботом.")
+            return
+        if not code:
+            await self._arm_invite(int(tg_id))
+            await self._send(chat_id, "Пришлите код приглашения следующим сообщением.")
+            return
+        await self._join_invite(chat_id, int(tg_id), code)
+
+    async def _cmd_bind(self, chat_id, title: str | None, code: str, reply_to, sender_tg, private: bool) -> None:
+        if private:
+            await self._send(chat_id, "Команду /bind нужно отправить в группе, куда добавлен бот и где ему можно писать.")
+            return
+        if not code:
+            await self._send(chat_id, "Получите код в панели: «Telegram» → «Подключить чат», затем отправьте /bind КОД.")
+            return
         with self.c.session_factory() as db:
             try:
-                user = TelegramLinkService(db, self.c.clock, self.c.settings).link_user(code, int(tg_id))
+                admin = TelegramLinkService(db, self.c.clock, self.c.settings).bind_chat(
+                    code, int(chat_id), title, int(sender_tg) if sender_tg is not None else None
+                )
+            except DomainError as exc:
+                await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}", reply_to=reply_to)
+                return
+            admin_tg = admin.telegram_user_id
+            bound_title = title or str(chat_id)
+        await self._send(
+            chat_id,
+            "Готово: напоминания о платежах будут приходить в этот чат.\n"
+            "Спросите: /topay — что оплатить, /overdue — что просрочено, /summary — итоги.",
+            reply_to=reply_to,
+        )
+        if admin_tg is not None:
+            await self._send(
+                admin_tg,
+                f"Группа «{html.escape(bound_title)}» привязана. Напоминания этой команды будут приходить туда.",
+            )
+
+    async def _sandbox_callback(self, cq: dict, data: str) -> None:
+        msg = cq.get("message") or {}
+        chat = msg.get("chat") or {}
+        chat_id = chat.get("id")
+        tg_id = (cq.get("from") or {}).get("id")
+        if chat.get("type") != "private" or chat_id is None or tg_id is None:
+            await self._answer(cq, "Это только в личке с ботом", alert=True)
+            return
+        await self._answer(cq, "Ок")
+        if data == "sb:new":
+            await self._create_sandbox(chat_id, int(tg_id))
+        elif data == "sb:join":
+            await self._arm_invite(int(tg_id))
+            await self._send(chat_id, "Пришлите код приглашения следующим сообщением или командой /join КОД.")
+        elif data == "sb:site":
+            await self._send(chat_id, SITE_TEXT)
+        elif data == "sb:bind":
+            await self._issue_bind_code(chat_id, int(tg_id))
+        else:
+            await self._send(chat_id, "Неизвестная команда")
+
+    async def _create_sandbox(self, chat_id, tg_id: int) -> None:
+        with self.c.session_factory() as db:
+            existing = UserRepository(db).get_by_telegram_id(tg_id)
+            if existing is not None:
+                if existing.team.kind == TeamKind.PRIMARY:
+                    await self._send(chat_id, HELP)
+                else:
+                    await self._send_sandbox_home(db, chat_id, existing)
+                return
+            try:
+                created = TeamService(db, self.c.clock, self.c.settings).create_sandbox(tg_id)
+            except DomainError as exc:
+                await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}")
+                return
+            admin_link = magic_url(self.c.settings, created.admin_code)
+            employee_link = magic_url(self.c.settings, created.employee_code)
+            when = created.expires_at.astimezone(self.c.settings.tz)
+        await self._send(
+            chat_id,
+            "Временная команда создана. Через 24 часа она удалится вместе с платежами и пользователями "
+            f"({when:%d.%m.%Y %H:%M}).\n\n"
+            f'<a href="{html.escape(admin_link)}">Открыть панель</a> — вход администратором, ссылка одноразовая.\n'
+            f'<a href="{html.escape(employee_link)}">Зайти как сотрудник</a> — тот же кабинет глазами пользователя «сотрудник».\n'
+            f"Пригласить коллегу: код <code>{html.escape(created.invite_code)}</code> "
+            f"(коллега пишет боту <code>/join {html.escape(created.invite_code)}</code>).\n"
+            "Привязать группу — кнопка ниже. Пока группа не привязана, напоминания приходят вам в личку.\n\n"
+            "Уже есть демо-платежи: аренда в рублях, сервер в долларах, подписка в евро.",
+            reply_markup={"inline_keyboard": [[{"text": "Привязать группу", "callback_data": "sb:bind"}]]},
+        )
+
+    async def _send_sandbox_home(self, db, chat_id, user) -> None:
+        svc = TeamService(db, self.c.clock, self.c.settings)
+        try:
+            admin_code = svc.magic_for(user if user.role == Role.ADMIN else user)
+        except DomainError as exc:
+            await self._send(chat_id, html.escape(exc.message))
+            return
+        lines = [
+            "Снова открыта ваша временная команда.",
+            f'<a href="{html.escape(magic_url(self.c.settings, admin_code))}">Открыть панель</a> — одноразовая ссылка.',
+        ]
+        markup = None
+        if user.role == Role.ADMIN:
+            employee = svc.employee_of(user.team_id)
+            if employee is not None:
+                try:
+                    emp_code = svc.magic_for(employee)
+                    lines.append(
+                        f'<a href="{html.escape(magic_url(self.c.settings, emp_code))}">Зайти как сотрудник</a>'
+                    )
+                except DomainError:
+                    pass
+            if user.team.invite_code:
+                lines.append(
+                    f"Пригласить коллегу: <code>{html.escape(user.team.invite_code)}</code> "
+                    f"(<code>/join {html.escape(user.team.invite_code)}</code>)."
+                )
+            title = user.team.telegram_chat_title
+            if user.team.telegram_chat_id:
+                lines.append(f"Группа привязана: {html.escape(title or str(user.team.telegram_chat_id))}.")
+            else:
+                lines.append("Группа не привязана — напоминания приходят вам в личку.")
+            markup = {"inline_keyboard": [[{"text": "Привязать группу", "callback_data": "sb:bind"}]]}
+        when = user.team.expires_at
+        if when is not None:
+            lines.append(f"Команда удалится {when.astimezone(self.c.settings.tz):%d.%m.%Y %H:%M}.")
+        await self._send(chat_id, "\n".join(lines), reply_markup=markup)
+
+    async def _arm_invite(self, tg_id: int) -> None:
+        now = self.c.clock.now()
+        from datetime import timedelta
+
+        with self.c.session_factory() as db:
+            stmt = insert(TelegramPending).values(
+                telegram_user_id=tg_id, action="await_invite", expires_at=now + timedelta(minutes=15)
+            )
+            db.execute(
+                stmt.on_conflict_do_update(
+                    index_elements=["telegram_user_id"],
+                    set_={"action": "await_invite", "expires_at": now + timedelta(minutes=15)},
+                )
+            )
+            db.commit()
+
+    async def _pending_invite(self, chat_id, tg_id: int, text: str) -> bool:
+        with self.c.session_factory() as db:
+            row = db.get(TelegramPending, tg_id)
+            if row is None or row.action != "await_invite" or row.expires_at < self.c.clock.now():
+                return False
+            db.delete(row)
+            db.commit()
+        await self._join_invite(chat_id, tg_id, text)
+        return True
+
+    async def _join_invite(self, chat_id, tg_id: int, code: str) -> None:
+        with self.c.session_factory() as db:
+            try:
+                user = TeamService(db, self.c.clock, self.c.settings).join_by_invite(tg_id, code)
             except DomainError as exc:
                 await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}")
                 return
             login = user.login
         await self._send(
             chat_id,
-            f"Готово: этот Telegram привязан к пользователю <b>{html.escape(login)}</b>.\n"
-            "Теперь вы можете нажимать «Оплачено» под напоминаниями и спрашивать бота: /topay, /overdue, /summary.",
+            f"Вы в команде как <b>{html.escape(login)}</b>. Можно смотреть платежи и нажимать «Оплачено».",
         )
 
-    async def _cmd_bind(self, chat_id, title: str | None, code: str, reply_to) -> None:
-        if not code:
-            await self._send(chat_id, "Получите код в панели: «Платежи» → «Подключить чат», затем отправьте /bind КОД.")
-            return
+    async def _issue_bind_code(self, chat_id, tg_id: int) -> None:
         with self.c.session_factory() as db:
-            try:
-                TelegramLinkService(db, self.c.clock, self.c.settings).bind_chat(code, int(chat_id), title)
-            except DomainError as exc:
-                await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}", reply_to=reply_to)
+            user = UserRepository(db).get_by_telegram_id(tg_id)
+            if user is None or user.role != Role.ADMIN:
+                await self._send(chat_id, "Привязать группу может только администратор команды.")
                 return
+            code = TelegramLinkService(db, self.c.clock, self.c.settings).create_chat_code(user)
+            token = code.code
         await self._send(
             chat_id,
-            "Готово: напоминания о платежах будут приходить в этот чат.\n"
-            "Спросите: /topay — что оплатить, /overdue — что просрочено, /summary — итоги.",
-            reply_to=reply_to,
+            "Добавьте бота в группу, разрешите ему писать сообщения и отправьте там "
+            f"(код действует 15 минут):\n<code>/bind {html.escape(token)}</code>\n"
+            "Песочница не может привязать основной чат из настроек.",
         )
 
     async def _answer(self, cq: dict, text: str, alert: bool = False) -> None:

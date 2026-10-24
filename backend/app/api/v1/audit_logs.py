@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import AdminDep, ContainerDep, DbDep
 from app.api.errors import responses
+from app.models import TeamKind
 from app.repositories.audit import AuditFilter, AuditRepository
 from app.schemas.audit import AuditLogOut, AuditLogPage
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/audit-logs", tags=["audit"])
     responses=responses(401, 403, 422),
 )
 def list_audit_logs(
-    _: AdminDep,
+    admin: AdminDep,
     c: ContainerDep,
     db: DbDep,
     action: str | None = Query(None, max_length=64, description="Префикс действия, например `occurrence.` или `auth.login`"),
@@ -40,6 +41,8 @@ def list_audit_logs(
         actor_login=actor_login or None,
         since=datetime.combine(from_, time.min, tz) if from_ else None,
         until=datetime.combine(to + timedelta(days=1), time.min, tz) if to else None,
+        team_id=admin.team_id,
+        include_unscoped=admin.team.kind == TeamKind.PRIMARY,
     )
     items, total = AuditRepository(db).query(f, (page - 1) * page_size, page_size)
     return AuditLogPage(

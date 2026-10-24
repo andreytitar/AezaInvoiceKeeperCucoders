@@ -22,8 +22,8 @@ R = responses(401, 403, 404, 422)
 
 
 @router.get("", response_model=list[WebhookOut], summary="Адреса вебхуков (admin)", responses=responses(401, 403))
-def list_webhooks(_: AdminDep, c: ContainerDep, db: DbDep) -> list[WebhookOut]:
-    return [WebhookOut.build(e) for e in WebhookService(db, c.clock, c.settings).list()]
+def list_webhooks(admin: AdminDep, c: ContainerDep, db: DbDep) -> list[WebhookOut]:
+    return [WebhookOut.build(e) for e in WebhookService(db, c.clock, c.settings).list(admin.team_id)]
 
 
 @router.post(
@@ -59,10 +59,10 @@ def delete_webhook(webhook_id: uuid.UUID, admin: AdminDep, c: ContainerDep, db: 
 
 @router.get("/{webhook_id}/deliveries", response_model=WebhookDeliveryPage, summary="Журнал доставок (admin)", responses=R)
 def webhook_deliveries(
-    webhook_id: uuid.UUID, _: AdminDep, c: ContainerDep, db: DbDep,
+    webhook_id: uuid.UUID, admin: AdminDep, c: ContainerDep, db: DbDep,
     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
 ) -> WebhookDeliveryPage:
-    items, total = WebhookService(db, c.clock, c.settings).deliveries(webhook_id, page, page_size)
+    items, total = WebhookService(db, c.clock, c.settings).deliveries(webhook_id, page, page_size, team_id=admin.team_id)
     return WebhookDeliveryPage(
         items=[
             WebhookDeliveryOut(
@@ -77,6 +77,6 @@ def webhook_deliveries(
 
 
 @router.post("/{webhook_id}/test", response_model=WebhookTestResult, summary="Отправить тестовое событие (admin)", responses=R)
-async def test_webhook(webhook_id: uuid.UUID, _: AdminDep, c: ContainerDep, db: DbDep) -> WebhookTestResult:
-    result = await WebhookService(db, c.clock, c.settings).ping(webhook_id)
+async def test_webhook(webhook_id: uuid.UUID, admin: AdminDep, c: ContainerDep, db: DbDep) -> WebhookTestResult:
+    result = await WebhookService(db, c.clock, c.settings).ping(webhook_id, team_id=admin.team_id)
     return WebhookTestResult(ok=result.ok, detail=result.external_id if result.ok else result.error)

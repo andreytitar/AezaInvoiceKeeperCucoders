@@ -49,11 +49,15 @@ class AuditService:
         after: dict | None = None,
         actor: User | None = None,
         actor_login: str | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> None:
         ctx = current()
+        if team_id is None and actor is not None:
+            team_id = actor.team_id
         self.repo.add(
             AuditLog(
                 at=self.clock.now(),
+                team_id=team_id,
                 actor_user_id=actor.id if actor else ctx.actor_id,
                 actor_login=(actor.login if actor else None) or actor_login or ctx.actor_login or SYSTEM_ACTOR,
                 action=action,

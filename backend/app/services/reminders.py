@@ -24,6 +24,7 @@ from app.infrastructure.channels.base import Action, ChannelRegistry, Notificati
 from app.models import DeliveryKind, DeliveryStatus, NotificationDelivery, PaymentOccurrence
 from app.repositories.reminders import ReminderRepository
 from app.services.audit import AuditService
+from app.services.team_delivery import clear_dead_chat, is_dead_chat_error, recipients_for
 
 log = logging.getLogger("app.reminders")
 
@@ -43,13 +44,13 @@ class ReminderService:
         self.channels = channels
         self.repo = ReminderRepository(db)
 
-    def scan(self, payment_id: uuid.UUID | None = None, commit: bool = True) -> int:
+    def scan(self, payment_id: uuid.UUID | None = None, commit: bool = True, team_id: uuid.UUID | None = None) -> int:
         """Находит периоды, по которым пора напомнить, и ставит доставки в очередь. Идемпотентно."""
         today = self.clock.today()
         now = self.clock.now()
         days = self.settings.reminder_days_before
         created = 0
-        for occ in self.repo.candidates(reminder_window_end(today, days), payment_id):
+        for occ in self.repo.candidates(reminder_window_end(today, days), payment_id, team_id):
             if not should_remind(
                 due_date=occ.due_date,
                 is_paid=occ.is_paid,
@@ -59,31 +60,31 @@ class ReminderService:
             ):
                 continue
             for channel in self.channels.all():
-                for recipient in channel.recipients():
+                for recipient in recipients_for(self.db, self.settings, channel, occ):
                     if self.repo.enqueue(occ.id, channel.name, recipient, DeliveryKind.REMINDER.value, now):
                         created += 1
-        created += self.scan_overdue_repeats(today, now)
+        created += self.scan_overdue_repeats(today, now, team_id)
         if commit:
             self.db.commit()
         if created:
             log.info("Поставлено напоминаний в очередь: %s", created)
         return created
 
-    def scan_overdue_repeats(self, today, now) -> int:
+    def scan_overdue_repeats(self, today, now, team_id: uuid.UUID | None = None) -> int:
         """Повторные напоминания о просрочке раз в OVERDUE_REMIND_EVERY_DAYS дней (вебхуки — отдельным событием).
         Первый повтор не уходит в тот же день, что и основное напоминание."""
         s = self.settings
         if s.overdue_remind_every_days <= 0:
             return 0
         created = 0
-        for occ in self.repo.candidates(today - timedelta(days=1)):
+        for occ in self.repo.candidates(today - timedelta(days=1), team_id=team_id):
             bucket = overdue_repeat_bucket((today - occ.due_date).days, s.overdue_remind_every_days, s.overdue_remind_max)
             if bucket is None or occ.payment.deleted_at is not None:
                 continue
             for channel in self.channels.all():
                 if channel.name == "webhook":
                     continue
-                for recipient in channel.recipients():
+                for recipient in recipients_for(self.db, self.settings, channel, occ):
                     if not self.repo.reminder_sent_before(occ.id, channel.name, recipient, now - timedelta(hours=12)):
                         continue
                     if self.repo.enqueue(occ.id, channel.name, recipient, f"overdue:{bucket}", now):
@@ -217,6 +218,12 @@ class DeliveryDispatcher:
                 d.last_error = None
                 d.external_id = result.external_id
                 stats.sent += 1
+            elif d.channel == "telegram" and is_dead_chat_error(result.error):
+                clear_dead_chat(db, d.recipient)
+                d.status = DeliveryStatus.DEAD
+                d.last_error = (result.error or "chat unavailable")[:2000]
+                stats.dead += 1
+                log.warning("Чат %s недоступен, доставка %s закрыта, привязка снята", d.recipient, d.id)
             elif d.attempts >= self.settings.delivery_max_attempts:
                 d.status = DeliveryStatus.DEAD
                 d.last_error = (result.error or "unknown error")[:2000]

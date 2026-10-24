@@ -52,7 +52,7 @@ class LinkCode(BaseModel):
 
 @router.get("/status", response_model=TelegramStatus, summary="Состояние Telegram-бота и привязок", responses=responses(401))
 async def telegram_status(user: UserDep, c: ContainerDep, db: DbDep) -> TelegramStatus:
-    chat = get_bound_chat(db, c.settings)
+    chat = get_bound_chat(db, c.settings, user.team)
     return TelegramStatus(
         enabled=c.settings.telegram_enabled,
         dry_run=not c.settings.telegram_enabled,

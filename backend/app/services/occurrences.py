@@ -43,10 +43,10 @@ class OccurrenceGenerator:
                 created += 1
         return created
 
-    def ensure_all(self) -> int:
+    def ensure_all(self, team_id: uuid.UUID | None = None) -> int:
         today = self.clock.today()
         created = 0
-        for payment in self.payments.list_alive():
+        for payment in self.payments.list_alive(team_id):
             created += self.ensure(payment, today)
             self.db.commit()
         return created
@@ -72,9 +72,9 @@ class OccurrenceService:
         items, total = self.occurrences.query(f, self.clock.today(), sort, (page - 1) * page_size, page_size)
         return OccurrencePage(items, total, page, page_size)
 
-    def get(self, occurrence_id: uuid.UUID) -> PaymentOccurrence:
+    def get(self, occurrence_id: uuid.UUID, team_id: uuid.UUID | None = None) -> PaymentOccurrence:
         occ = self.occurrences.get(occurrence_id)
-        if occ is None:
+        if occ is None or (team_id is not None and occ.payment.team_id != team_id):
             raise NotFound("Период не найден")
         return occ
 
@@ -90,7 +90,7 @@ class OccurrenceService:
     ) -> PaymentOccurrence:
         """Подтверждение/отмена оплаты конкретного периода (раздел 2.3). Идемпотентно."""
         occ = self.occurrences.get_for_update(occurrence_id)
-        if occ is None:
+        if occ is None or (actor is not None and occ.payment.team_id != actor.team_id):
             raise NotFound("Период не найден")
         mark = apply_status_change(
             current_is_paid=occ.is_paid,

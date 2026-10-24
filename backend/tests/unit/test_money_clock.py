@@ -3,13 +3,21 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from app.domain.clock import FixedClock, SystemClock
-from app.domain.money import format_amount, has_at_most_two_decimals
+from app.domain.money import NBSP, format_amount, has_at_most_two_decimals
 
 
 def test_format_amount():
-    assert format_amount(Decimal("55000"), "RUB") == "55 000,00 ₽"
-    assert format_amount(Decimal("9.99"), "EUR") == "9,99 €"
-    assert format_amount(Decimal("1234567.5"), "USD") == "1 234 567,50 $"
+    assert format_amount(Decimal("55000"), "RUB") == f"55{NBSP}000,00{NBSP}₽"
+    assert format_amount(Decimal("9.99"), "EUR") == f"9,99{NBSP}€"
+    assert format_amount(Decimal("1234567.5"), "USD") == f"1{NBSP}234{NBSP}567,50{NBSP}$"
+    assert format_amount(Decimal("-55000.5"), "RUB") == f"-55{NBSP}000,50{NBSP}₽"
+    for amount in (
+        format_amount(Decimal("55000"), "RUB"),
+        format_amount(Decimal("9.99"), "EUR"),
+        format_amount(Decimal("1234567.5"), "USD"),
+    ):
+        assert " " not in amount
+        assert NBSP in amount
 
 
 def test_two_decimals():

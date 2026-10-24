@@ -65,7 +65,7 @@ def test_pdf_receipt(admin, user):
 def test_no_matching_amount(admin, user):
     create_payment(admin, title="Аренда", amount="50000", currency="RUB", first_due_date="2026-10-20")
     body = scan(user, receipt_png()).json()
-    assert body["status"] == "no_match" and "55 000,00" in body["message"]
+    assert body["status"] == "no_match" and "55\u00a0000,00" in body["message"]
 
 
 def test_not_a_receipt(user):

@@ -82,10 +82,15 @@ def _totals(items: list[PaymentOccurrence]) -> str:
 
 
 class BotAnswers:
-    def __init__(self, db: DbSession, clock: Clock) -> None:
+    def __init__(self, db: DbSession, clock: Clock, team_id=None) -> None:
         self.db = db
         self.clock = clock
+        self.team_id = team_id
         self.repo = OccurrenceRepository(db)
+
+    def _scope(self, f: OccurrenceFilter) -> OccurrenceFilter:
+        f.team_id = self.team_id
+        return f
 
     def _line(self, o: PaymentOccurrence) -> str:
         today = self.clock.today()
@@ -116,17 +121,17 @@ class BotAnswers:
         return BotAnswer("\n".join(lines), btns)
 
     def topay(self) -> BotAnswer:
-        return self._list(OccurrenceFilter(status="unpaid"), "due_date", "Что и когда оплатить", "Всё оплачено.", True)
+        return self._list(self._scope(OccurrenceFilter(status="unpaid")), "due_date", "Что и когда оплатить", "Всё оплачено.", True)
 
     def overdue(self) -> BotAnswer:
         return self._list(
-            OccurrenceFilter(status="unpaid", overdue=True), "due_date", "Просрочено", "Просрочек нет.", True
+            self._scope(OccurrenceFilter(status="unpaid", overdue=True)), "due_date", "Просрочено", "Просрочек нет.", True
         )
 
     def week(self) -> BotAnswer:
         today = self.clock.today()
         return self._list(
-            OccurrenceFilter(status="unpaid", overdue=False, date_to=today + timedelta(days=7)),
+            self._scope(OccurrenceFilter(status="unpaid", overdue=False, date_to=today + timedelta(days=7))),
             "due_date",
             "Ближайшие 7 дней",
             "В ближайшую неделю платежей нет.",
@@ -137,7 +142,7 @@ class BotAnswers:
         today = self.clock.today()
         items = [
             o
-            for o in self.repo.all_filtered(OccurrenceFilter(status="paid"), today)
+            for o in self.repo.all_filtered(self._scope(OccurrenceFilter(status="paid")), today)
             if o.paid_date and o.paid_date >= today - timedelta(days=30)
         ]
         items.sort(key=lambda o: o.paid_date, reverse=True)
@@ -148,7 +153,7 @@ class BotAnswers:
         return BotAnswer("\n".join(lines))
 
     def summary(self) -> BotAnswer:
-        s = SummaryService(self.db, self.clock).summary()
+        s = SummaryService(self.db, self.clock).summary(self._scope(OccurrenceFilter()))
         lines = [f"<b>Итоги на {s.as_of:%d.%m.%Y}</b>", ""]
         for c in s.currencies:
             if not c.total.count:

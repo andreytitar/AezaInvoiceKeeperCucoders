@@ -19,13 +19,13 @@ router = APIRouter(prefix="/recurring-payments", tags=["recurring-payments"])
 
 @router.get("", response_model=list[RecurringPaymentOut], summary="Список регулярных платежей", responses=responses(401))
 def list_payments(
-    _: UserDep,
+    user: UserDep,
     c: ContainerDep,
     db: DbDep,
     include_deleted: bool = Query(False, description="Показать и прекращённые платежи"),
 ) -> list[RecurringPaymentOut]:
     svc = PaymentService(db, c.clock, c.settings)
-    payments = svc.list(include_deleted)
+    payments = svc.list(include_deleted, team_id=user.team_id)
     next_due = svc.next_due_dates([p.id for p in payments])
     return [RecurringPaymentOut.build(p, next_due[p.id]) for p in payments]
 

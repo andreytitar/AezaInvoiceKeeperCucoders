@@ -11,7 +11,7 @@ from email.message import EmailMessage
 from email.utils import make_msgid
 
 from app.config import Settings
-from app.domain.money import format_amount
+from app.domain.money import NBSP, format_amount
 from app.infrastructure.channels.base import Notification, SendResult
 from app.infrastructure.channels.formatting import due_phrase, plain_text
 
@@ -31,7 +31,7 @@ def build_email(n: Notification, sender: str, recipient: str) -> EmailMessage:
 <h2 style="margin:0 0 12px">{html.escape(prefix)}</h2>
 <table style="border-collapse:collapse;font-family:Menlo,monospace;font-size:14px">
 <tr><td style="padding:4px 16px 4px 0;color:#5d574c">Название</td><td><b>{html.escape(n.title)}</b></td></tr>
-<tr><td style="padding:4px 16px 4px 0;color:#5d574c">Сумма</td><td><b>{amount}</b> ({n.currency})</td></tr>
+<tr><td style="padding:4px 16px 4px 0;color:#5d574c">Сумма</td><td><b>{amount}</b>{NBSP}({n.currency})</td></tr>
 <tr><td style="padding:4px 16px 4px 0;color:#5d574c">Дата оплаты</td><td><b>{n.due_date:%d.%m.%Y}</b> — {html.escape(due_phrase(n.days_until_due))}</td></tr>
 </table></div>""",
         subtype="html",

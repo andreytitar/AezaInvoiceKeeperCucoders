@@ -19,9 +19,11 @@ from app.infrastructure.security import (
     new_session_token,
     verify_password,
 )
-from app.models import Role, Session, User
+from app.models import Role, Session, TeamKind, User
+from app.repositories.teams import TeamRepository
 from app.repositories.users import SessionRepository, UserRepository
 from app.services.audit import AuditService
+from app.services.telegram_link import TelegramLinkService
 
 log = logging.getLogger("app.auth")
 
@@ -65,6 +67,16 @@ class AuthService:
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
 
+        result = self._open_session(user)
+        log.info("Успешный вход", extra={"login": user.login, "ip": ip})
+        return result
+
+    def login_magic(self, code: str) -> LoginResult:
+        user = TelegramLinkService(self.db, self.clock, self.settings).consume_magic(code)
+        self._ensure_team_alive(user)
+        return self._open_session(user, action="auth.magic_login")
+
+    def _open_session(self, user: User, action: str = "auth.login") -> LoginResult:
         now = self.clock.now()
         token = new_session_token()
         session = self.sessions.add(
@@ -76,10 +88,14 @@ class AuthService:
                 last_seen_at=now,
             )
         )
-        AuditService(self.db, self.clock).log("auth.login", entity_type="user", entity_id=user.id, actor=user)
+        AuditService(self.db, self.clock).log(action, entity_type="user", entity_id=user.id, actor=user)
         self.db.commit()
-        log.info("Успешный вход", extra={"login": user.login, "ip": ip})
         return LoginResult(user=user, token=token, session=session)
+
+    def _ensure_team_alive(self, user: User) -> None:
+        team = user.team
+        if team is not None and team.kind == TeamKind.SANDBOX and team.expires_at and team.expires_at <= self.clock.now():
+            raise Unauthorized("Срок временной команды истёк")
 
     def authenticate(self, token: str) -> tuple[User, Session]:
         now = self.clock.now()
@@ -89,6 +105,9 @@ class AuthService:
         user = self.users.get(session.user_id)
         if user is None:
             raise Unauthorized("Требуется авторизация")
+        team = user.team
+        if team is not None and team.kind == TeamKind.SANDBOX and team.expires_at and team.expires_at <= now:
+            raise Unauthorized("Срок временной команды истёк")
         if (now - session.last_seen_at).total_seconds() > 60:
             session.last_seen_at = now
             self.db.commit()
@@ -104,6 +123,12 @@ class AuthService:
         действует после рестарта и ревокует старые сессии админа."""
         s = self.settings
         now = self.clock.now()
+        primary = TeamRepository(self.db).ensure_primary()
+        if s.telegram_chat_id and primary.telegram_chat_id is None:
+            raw = str(s.telegram_chat_id).strip()
+            if raw.lstrip("-").isdigit():
+                primary.telegram_chat_id = int(raw)
+                log.info("Основной команде назначен чат из TELEGRAM_CHAT_ID")
         for other in self.users.list_system():
             if other.login.lower() != s.admin_login.lower():
                 other.deleted_at = now
@@ -121,10 +146,17 @@ class AuthService:
 
         if admin is None:
             admin = self.users.add(
-                User(login=s.admin_login, password_hash=hash_password(s.admin_password), role=Role.ADMIN, is_system=True)
+                User(
+                    team_id=primary.id,
+                    login=s.admin_login,
+                    password_hash=hash_password(s.admin_password),
+                    role=Role.ADMIN,
+                    is_system=True,
+                )
             )
             log.info("Системный администратор создан", extra={"login": s.admin_login})
         else:
+            admin.team_id = primary.id
             admin.role = Role.ADMIN
             if not verify_password(admin.password_hash, s.admin_password):
                 admin.password_hash = hash_password(s.admin_password)

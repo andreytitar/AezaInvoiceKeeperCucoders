@@ -75,6 +75,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/magic/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Вход по одноразовой ссылке из бота
+         * @description Ставит ту же HttpOnly-сессию, что и обычный вход, и перенаправляет в панель. Ссылка сгорает после первого открытия.
+         */
+        get: operations["magic_login_api_v1_auth_magic__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -993,6 +1013,7 @@ export interface components {
             created_at: string;
             /** Is System */
             is_system: boolean;
+            team: components["schemas"]["TeamOut"];
         };
         /** MoneyBucket */
         MoneyBucket: {
@@ -1243,6 +1264,28 @@ export interface components {
             as_of: string;
             /** Currencies */
             currencies: components["schemas"]["CurrencySummaryOut"][];
+        };
+        /**
+         * TeamKind
+         * @enum {string}
+         */
+        TeamKind: "primary" | "sandbox";
+        /** TeamOut */
+        TeamOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["TeamKind"];
+            /** Name */
+            name: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Chat Bound */
+            chat_bound: boolean;
+            /** Chat Title */
+            chat_title: string | null;
         };
         /** TelegramStatus */
         TelegramStatus: {
@@ -1610,6 +1653,37 @@ export interface operations {
             };
             /** @description Не авторизован */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    magic_login_api_v1_auth_magic__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

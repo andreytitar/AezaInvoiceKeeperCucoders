@@ -68,21 +68,24 @@ class WebhookService:
         if bad or not events:
             raise ValidationError(f"События: {', '.join(EVENTS)}", details={"field": "events", "invalid": bad})
 
-    def get(self, endpoint_id: uuid.UUID) -> WebhookEndpoint:
+    def get(self, endpoint_id: uuid.UUID, team_id: uuid.UUID | None = None) -> WebhookEndpoint:
         ep = self.repo.get(endpoint_id)
-        if ep is None:
+        if ep is None or (team_id is not None and ep.team_id != team_id):
             raise NotFound("Вебхук не найден")
         return ep
 
-    def list(self) -> list[WebhookEndpoint]:
-        return self.repo.list()
+    def list(self, team_id: uuid.UUID | None = None) -> list[WebhookEndpoint]:
+        return self.repo.list(team_id)
 
     def create(self, *, url: str, events: list[str], secret: str | None, is_active: bool, description: str | None,
                actor: User | None) -> WebhookEndpoint:
         events = sorted(set(events))
         self._validate(url, events)
+        if actor is None:
+            raise NotFound("Вебхук не найден")
         ep = self.repo.add(
             WebhookEndpoint(
+                team_id=actor.team_id,
                 url=url,
                 events=events,
                 is_active=is_active,
@@ -95,7 +98,7 @@ class WebhookService:
         return ep
 
     def update(self, endpoint_id: uuid.UUID, fields: dict, actor: User | None) -> WebhookEndpoint:
-        ep = self.get(endpoint_id)
+        ep = self.get(endpoint_id, actor.team_id if actor else None)
         before = _snap(ep)
         url = fields.get("url", ep.url)
         events = sorted(set(fields.get("events", ep.events)))
@@ -114,18 +117,18 @@ class WebhookService:
         return ep
 
     def delete(self, endpoint_id: uuid.UUID, actor: User | None) -> None:
-        ep = self.get(endpoint_id)
+        ep = self.get(endpoint_id, actor.team_id if actor else None)
         AuditService(self.db, self.clock).log("webhook.delete", entity_type="webhook", entity_id=ep.id, before=_snap(ep), actor=actor)
         self.db.delete(ep)
         self.db.commit()
 
-    def deliveries(self, endpoint_id: uuid.UUID, page: int, page_size: int):
-        self.get(endpoint_id)
+    def deliveries(self, endpoint_id: uuid.UUID, page: int, page_size: int, team_id: uuid.UUID | None = None):
+        self.get(endpoint_id, team_id)
         return self.repo.deliveries(endpoint_id, (page - 1) * page_size, page_size)
 
-    async def ping(self, endpoint_id: uuid.UUID) -> SendResult:
+    async def ping(self, endpoint_id: uuid.UUID, team_id: uuid.UUID | None = None) -> SendResult:
         """Тестовое событие payment.reminder с вымышленными данными (не пишется в очередь)."""
-        ep = self.get(endpoint_id)
+        ep = self.get(endpoint_id, team_id)
         n = Notification(
             occurrence_id=uuid.UUID(int=0),
             title="Тестовое событие Invoice Keeper",
@@ -158,19 +161,21 @@ class WebhookEvents:
         """Каждое изменение статуса — отдельное событие со своим ключом идемпотентности."""
         kind = f"{event}:{uuid.uuid4().hex[:12]}"
         created = 0
-        for ep in self.repo.subscribed(event):
+        team_id = occ.payment.team_id if occ.payment is not None else None
+        for ep in self.repo.subscribed(event, team_id):
             if self.deliveries.enqueue(occ.id, "webhook", str(ep.id), kind, self.clock.now()):
                 created += 1
         return created
 
-    def scan_overdue(self) -> int:
+    def scan_overdue(self, team_id: uuid.UUID | None = None) -> int:
         """Одно событие payment.overdue на период и адрес (UNIQUE), когда срок прошёл и не оплачено."""
-        endpoints = self.repo.subscribed("payment.overdue")
-        if not endpoints:
-            return 0
         today = self.clock.today()
         created = 0
-        for occ in self.deliveries.candidates(today - timedelta(days=1)):
+        for occ in self.deliveries.candidates(today - timedelta(days=1), team_id=team_id):
+            scope = occ.payment.team_id if occ.payment is not None else team_id
+            endpoints = self.repo.subscribed("payment.overdue", scope)
+            if not endpoints:
+                continue
             for ep in endpoints:
                 if self.deliveries.enqueue(occ.id, "webhook", str(ep.id), "payment.overdue", self.clock.now()):
                     created += 1

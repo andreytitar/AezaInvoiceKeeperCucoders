@@ -3,6 +3,7 @@
 import asyncio
 from datetime import timedelta
 
+from app.repositories.users import UserRepository
 from app.services.telegram_link import chat_provider
 from tests.integration.helpers import create_payment, occurrences_of
 from tests.worker.test_telegram_button import FakeTelegramClient
@@ -10,6 +11,14 @@ from tests.worker.test_telegram_button import FakeTelegramClient
 from app.services.telegram_updates import TelegramUpdateHandler
 
 GROUP = -100777
+ADMIN_TG = 777
+
+
+def link_system_admin(container, tg_id=ADMIN_TG):
+    with container.session_factory() as db:
+        admin = UserRepository(db).get_by_login("admin")
+        admin.telegram_user_id = tg_id
+        db.commit()
 
 
 def msg(text, chat_id=GROUP, tg_id=555, chat_type="supergroup", title="Бухгалтерия", update_id=1):
@@ -59,9 +68,10 @@ def test_start_in_group_rejected(user, container):
 
 def test_bind_chat_and_reminders_go_there(admin, user, container):
     assert user.post("/api/v1/telegram/chat-link").status_code == 403
+    link_system_admin(container, 555)
     code = admin.post("/api/v1/telegram/chat-link").json()
     assert code["command"].startswith("/bind ")
-    c = send(container, msg(code["command"] + "", title="Бухгалтерия"))
+    c = send(container, msg(code["command"] + "", title="Бухгалтерия", tg_id=555))
     assert "будут приходить в этот чат" in c.messages[0]["text"]
     st = admin.get("/api/v1/telegram/status").json()
     assert st["chat_bound"] and st["chat_title"] == "Бухгалтерия" and st["chat_source"] == "bind"
@@ -77,8 +87,9 @@ def test_bind_with_user_code_fails(user, container):
 
 
 def bind(admin, container):
+    link_system_admin(container)
     code = admin.post("/api/v1/telegram/chat-link").json()["command"]
-    send(container, msg(code))
+    send(container, msg(code, tg_id=ADMIN_TG))
 
 
 def test_topay_in_bound_chat_with_buttons(admin, user, container):
@@ -88,7 +99,7 @@ def test_topay_in_bound_chat_with_buttons(admin, user, container):
     c = send(container, msg("/topay@InvoiceKeeperBot", tg_id=999))  # участник чата, не привязан
     text = c.messages[0]["text"]
     assert "Что и когда оплатить" in text and "Сервер" in text and "просрочено 5 дн." in text
-    assert "Итого:" in text and "25,00 $" in text
+    assert "Итого:" in text and "25,00\u00a0$" in text
     buttons = c.messages[0]["reply_markup"]["inline_keyboard"]
     assert buttons[0][0]["callback_data"].startswith("lp:")
 
@@ -135,7 +146,8 @@ def test_paid_and_week_and_summary(admin, user, regular_user, container, clock):
     assert "Аренда" in w and "через 4 дн." in w
     user.patch(f"/api/v1/payment-occurrences/{oid}", json={"status": "paid"})
     pd = send(container, msg("/paid", chat_id=555, chat_type="private")).messages[0]["text"]
-    assert "оплачено 24.10" in pd and "55 000,00 ₽" in pd
+    assert "оплачено 24.10" in pd and "55\u00a0000,00\u00a0₽" in pd
+    assert "55 000" not in pd
     sm = send(container, msg("/summary", chat_id=555, chat_type="private")).messages[0]["text"]
     assert "<b>RUB</b>" in sm and "USD" not in sm
 

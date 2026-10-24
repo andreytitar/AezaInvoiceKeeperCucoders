@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str | None = None
     telegram_api_base: str = "https://api.telegram.org"
     telegram_polling_enabled: bool = True
+    # Публичный адрес панели: одноразовые ссылки из бота ведут сюда
+    public_base_url: str = "http://localhost:8000"
 
     # --- Email (SMTP) ---
     smtp_host: str | None = None

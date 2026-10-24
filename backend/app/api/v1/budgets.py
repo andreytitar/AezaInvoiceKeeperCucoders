@@ -15,12 +15,12 @@ router = APIRouter(prefix="/budgets", tags=["budgets"])
 
 @router.get("", response_model=list[BudgetOut], summary="Бюджеты (все пользователи)", responses=responses(401, 422))
 def list_budgets(
-    _: UserDep, c: ContainerDep, db: DbDep,
+    user: UserDep, c: ContainerDep, db: DbDep,
     period_type: BudgetPeriod | None = None,
     year: int | None = Query(None, ge=2000, le=2100),
     month: int | None = Query(None, ge=1, le=12),
 ) -> list[BudgetOut]:
-    return [BudgetOut.build(b) for b in BudgetService(db, c.clock).list(period_type, year, month)]
+    return [BudgetOut.build(b) for b in BudgetService(db, c.clock).list(period_type, year, month, team_id=user.team_id)]
 
 
 @router.put(
@@ -45,9 +45,9 @@ def delete_budget(budget_id: uuid.UUID, admin: AdminDep, c: ContainerDep, db: Db
 
 @router.get("/report", response_model=BudgetReportOut, summary="План/факт по каждой валюте", responses=responses(401, 422))
 def budget_report(
-    _: UserDep, c: ContainerDep, db: DbDep,
+    user: UserDep, c: ContainerDep, db: DbDep,
     period_type: BudgetPeriod = BudgetPeriod.MONTH,
     year: int = Query(..., ge=2000, le=2100),
     month: int | None = Query(None, ge=1, le=12),
 ) -> BudgetReportOut:
-    return BudgetReportOut.build(BudgetService(db, c.clock).report(period_type, year, month))
+    return BudgetReportOut.build(BudgetService(db, c.clock).report(period_type, year, month, team_id=user.team_id))

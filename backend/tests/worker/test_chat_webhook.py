@@ -35,7 +35,7 @@ def test_slack_message(admin, container):
     create_payment(admin, title="Сервер", amount="25", currency="USD", first_due_date="2026-10-26")
     assert len(rec) == 1
     text = rec[0]["text"]
-    assert "*Сервер*" in text and "25,00 $ (USD)" in text and "26.10.2026" in text
+    assert "*Сервер*" in text and "25,00\u00a0$\u00a0(USD)" in text and "26.10.2026" in text
     d = deliveries(container)[0]
     assert d.channel == "chat" and "secret" not in d.recipient  # токен URL не попадает в БД
 

@@ -25,16 +25,24 @@ class CheckStats:
         return asdict(self)
 
 
-async def run_checks(c) -> CheckStats:
-    """Идемпотентно: генерация периодов -> постановка напоминаний и событий -> доставка."""
+async def run_checks(c, team_id=None) -> CheckStats:
+    """Идемпотентно: генерация периодов -> постановка напоминаний и событий -> доставка.
+
+    team_id=None — все команды (worker). Иначе только команда вызвавшего админа.
+    Просроченные песочницы удаляются всегда.
+    """
+    from app.services.teams import TeamService
+
     stats = CheckStats()
     with c.session_factory() as db:
-        stats.periods_created = OccurrenceGenerator(db, c.clock).ensure_all()
+        TeamService(db, c.clock, c.settings).purge_expired()
     with c.session_factory() as db:
-        stats.reminders_queued = ReminderService(db, c.clock, c.settings, c.channels).scan()
+        stats.periods_created = OccurrenceGenerator(db, c.clock).ensure_all(team_id)
     with c.session_factory() as db:
-        stats.overdue_events_queued = WebhookEvents(db, c.clock).scan_overdue()
+        stats.reminders_queued = ReminderService(db, c.clock, c.settings, c.channels).scan(team_id=team_id)
+    with c.session_factory() as db:
+        stats.overdue_events_queued = WebhookEvents(db, c.clock).scan_overdue(team_id)
     d = await make_dispatcher(c).run()
-    stats.digest_sent = await send_weekly_digest(c)
+    stats.digest_sent = await send_weekly_digest(c, team_id=team_id)
     stats.sent, stats.failed, stats.dead, stats.cancelled = d.sent, d.failed, d.dead, d.cancelled
     return stats

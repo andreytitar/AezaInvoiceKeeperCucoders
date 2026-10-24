@@ -37,7 +37,8 @@ def test_send_message_contains_required_fields():
     assert result.ok and result.external_id == "-100500:7"
     assert seen["url"].endswith("/sendMessage")
     text = seen["body"]["text"]
-    assert "Аренда &lt;офиса&gt;" in text and "55 000,00 ₽" in text and "RUB" in text and "26.10.2026" in text
+    assert "Аренда &lt;офиса&gt;" in text and "55\u00a0000,00\u00a0₽" in text and "RUB" in text and "26.10.2026" in text
+    assert "55 000" not in text
     assert seen["body"]["chat_id"] == "-100500" and seen["body"]["parse_mode"] == "HTML"
 
 

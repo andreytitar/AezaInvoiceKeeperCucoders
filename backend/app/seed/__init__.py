@@ -22,6 +22,7 @@ from app.domain.schedule import add_months, days_in_month
 from app.domain.status import PaymentStatus
 from app.models import AppMeta
 from app.repositories.payments import OccurrenceRepository, PaymentRepository
+from app.repositories.teams import TeamRepository
 from app.repositories.users import UserRepository
 from app.services.occurrences import OccurrenceService
 from app.services.payments import PaymentService
@@ -56,16 +57,17 @@ def run_seed(c: Container, force: bool = False) -> bool:
             log.info("Сид уже применён — пропускаю")
             return False
         today = c.clock.today()
+        primary = TeamRepository(db).ensure_primary()
         users = UserService(db, c.clock, c.settings)
         for login in SEED_USERS:
             if UserRepository(db).get_by_login(login) is None:
-                users.create(login=login, password=c.settings.seed_user_password)
+                users.create(login=login, password=c.settings.seed_user_password, team_id=primary.id)
 
         payments = PaymentService(db, c.clock, c.settings, c.channels)
         repo = PaymentRepository(db)
 
         def ensure(title: str, amount: str, currency: Currency, first_due: date):
-            existing = repo.find_by_title(title)
+            existing = repo.find_by_title(title, team_id=primary.id)
             if existing:
                 return existing, False
             return payments.create(

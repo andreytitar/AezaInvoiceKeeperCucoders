@@ -42,14 +42,14 @@ class ReceiptService:
         self.storage = storage or LocalStorage(settings.uploads_dir)
         self.occurrences = OccurrenceRepository(db)
 
-    def _occurrence(self, occurrence_id: uuid.UUID):
+    def _occurrence(self, occurrence_id: uuid.UUID, team_id: uuid.UUID | None = None):
         occ = self.occurrences.get(occurrence_id)
-        if occ is None:
+        if occ is None or (team_id is not None and occ.payment.team_id != team_id):
             raise NotFound("Период не найден")
         return occ
 
-    def get(self, occurrence_id: uuid.UUID) -> Receipt:
-        self._occurrence(occurrence_id)
+    def get(self, occurrence_id: uuid.UUID, team_id: uuid.UUID | None = None) -> Receipt:
+        self._occurrence(occurrence_id, team_id)
         r = self.db.scalar(select(Receipt).where(Receipt.occurrence_id == occurrence_id))
         if r is None:
             raise NotFound("Чек не прикреплён")
@@ -66,7 +66,7 @@ class ReceiptService:
         fiscal_sign: str | None = None,
         commit: bool = True,
     ) -> Receipt:
-        self._occurrence(occurrence_id)
+        self._occurrence(occurrence_id, actor.team_id if actor is not None else None)
         if not url and file_bytes is None:
             raise ValidationError("Передайте ссылку и/или файл", details={"fields": ["url", "file"]})
         new_file = None
@@ -110,7 +110,7 @@ class ReceiptService:
         return r
 
     def delete(self, occurrence_id: uuid.UUID, actor: User | None) -> None:
-        r = self.get(occurrence_id)
+        r = self.get(occurrence_id, actor.team_id if actor is not None else None)
         file_path = r.file_path
         AuditService(self.db, self.clock).log(
             "receipt.delete", entity_type="payment_occurrence", entity_id=occurrence_id, before=_snapshot(r), actor=actor
@@ -120,8 +120,8 @@ class ReceiptService:
         if file_path:
             self.storage.delete(file_path)
 
-    def file(self, occurrence_id: uuid.UUID):
-        r = self.get(occurrence_id)
+    def file(self, occurrence_id: uuid.UUID, team_id: uuid.UUID | None = None):
+        r = self.get(occurrence_id, team_id)
         if not r.file_path:
             raise NotFound("К чеку не прикреплён файл")
         path = self.storage.path(r.file_path)

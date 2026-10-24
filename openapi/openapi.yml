@@ -106,6 +106,33 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/auth/magic/{code}:
+    get:
+      tags:
+      - auth
+      summary: Вход по одноразовой ссылке из бота
+      description: Ставит ту же HttpOnly-сессию, что и обычный вход, и перенаправляет в панель. Ссылка сгорает после первого
+        открытия.
+      operationId: magic_login_api_v1_auth_magic__code__get
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Code
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/logout:
     post:
       tags:
@@ -2480,6 +2507,8 @@ components:
         is_system:
           type: boolean
           title: Is System
+        team:
+          $ref: '#/components/schemas/TeamOut'
       type: object
       required:
       - id
@@ -2489,6 +2518,7 @@ components:
       - telegram_user_id
       - created_at
       - is_system
+      - team
       title: MeOut
     MoneyBucket:
       properties:
@@ -2893,6 +2923,46 @@ components:
       - as_of
       - currencies
       title: SummaryOut
+    TeamKind:
+      type: string
+      enum:
+      - primary
+      - sandbox
+      title: TeamKind
+    TeamOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          $ref: '#/components/schemas/TeamKind'
+        name:
+          type: string
+          title: Name
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        chat_bound:
+          type: boolean
+          title: Chat Bound
+        chat_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chat Title
+      type: object
+      required:
+      - id
+      - kind
+      - name
+      - expires_at
+      - chat_bound
+      - chat_title
+      title: TeamOut
     TelegramStatus:
       properties:
         enabled:

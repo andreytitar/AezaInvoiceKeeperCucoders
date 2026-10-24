@@ -12,8 +12,11 @@ class WebhookRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def list(self) -> list[WebhookEndpoint]:
-        return list(self.db.scalars(select(WebhookEndpoint).order_by(WebhookEndpoint.created_at)))
+    def list(self, team_id: uuid.UUID | None = None) -> list[WebhookEndpoint]:
+        stmt = select(WebhookEndpoint).order_by(WebhookEndpoint.created_at)
+        if team_id is not None:
+            stmt = stmt.where(WebhookEndpoint.team_id == team_id)
+        return list(self.db.scalars(stmt))
 
     def get(self, endpoint_id: uuid.UUID) -> WebhookEndpoint | None:
         return self.db.get(WebhookEndpoint, endpoint_id)
@@ -23,12 +26,11 @@ class WebhookRepository:
         self.db.flush()
         return ep
 
-    def subscribed(self, event: str) -> list[WebhookEndpoint]:
-        return list(
-            self.db.scalars(
-                select(WebhookEndpoint).where(WebhookEndpoint.is_active.is_(True), WebhookEndpoint.events.any(event))
-            )
-        )
+    def subscribed(self, event: str, team_id: uuid.UUID | None = None) -> list[WebhookEndpoint]:
+        stmt = select(WebhookEndpoint).where(WebhookEndpoint.is_active.is_(True), WebhookEndpoint.events.any(event))
+        if team_id is not None:
+            stmt = stmt.where(WebhookEndpoint.team_id == team_id)
+        return list(self.db.scalars(stmt))
 
     def deliveries(self, endpoint_id: uuid.UUID, offset: int, limit: int) -> tuple[list[NotificationDelivery], int]:
         stmt = select(NotificationDelivery).where(

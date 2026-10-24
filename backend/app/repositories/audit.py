@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.models import AuditLog
@@ -17,6 +18,8 @@ class AuditFilter:
     actor_login: str | None = None
     since: datetime | None = None
     until: datetime | None = None
+    team_id: uuid.UUID | None = None
+    include_unscoped: bool = False
 
 
 class AuditRepository:
@@ -40,6 +43,11 @@ class AuditRepository:
             stmt = stmt.where(AuditLog.at >= f.since)
         if f.until:
             stmt = stmt.where(AuditLog.at < f.until)
+        if f.team_id is not None:
+            if f.include_unscoped:
+                stmt = stmt.where(or_(AuditLog.team_id == f.team_id, AuditLog.team_id.is_(None)))
+            else:
+                stmt = stmt.where(AuditLog.team_id == f.team_id)
         total = self.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
         items = list(self.db.scalars(stmt.order_by(AuditLog.at.desc(), AuditLog.seq.desc()).offset(offset).limit(limit)))
         return items, total

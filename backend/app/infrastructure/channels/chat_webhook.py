@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.domain.money import format_amount
+from app.domain.money import NBSP, format_amount
 from app.infrastructure.channels.base import Notification, SendResult
 from app.infrastructure.channels.formatting import due_phrase
 from app.infrastructure.net_guard import UnsafeUrl, check_url
@@ -32,7 +32,7 @@ def detect_format(url: str, configured: str) -> str:
 
 def render(n: Notification, fmt: str) -> dict:
     head = "Просроченный платёж" if n.days_until_due < 0 else "Напоминание об оплате"
-    amount = f"{format_amount(n.amount, n.currency)} ({n.currency})"
+    amount = f"{format_amount(n.amount, n.currency)}{NBSP}({n.currency})"
     due = f"{n.due_date:%d.%m.%Y} — {due_phrase(n.days_until_due)}"
     if fmt == "discord":
         return {

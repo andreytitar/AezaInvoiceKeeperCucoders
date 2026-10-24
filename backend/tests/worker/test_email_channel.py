@@ -51,7 +51,8 @@ def test_email_content():
     msg = build_email(n, "IK <ik@x.y>", "a@b.cd")
     assert "Аренда <офиса>" in msg["Subject"] and "26.10.2026" in msg["Subject"]
     text = msg.get_body(("plain",)).get_content()
-    assert "55 000,00 ₽" in text and "RUB" in text and "26.10.2026" in text
+    assert "55\u00a0000,00\u00a0₽" in text and "RUB" in text and "26.10.2026" in text
+    assert "55 000" not in text
     assert "&lt;офиса&gt;" in msg.get_body(("html",)).get_content()
 
 

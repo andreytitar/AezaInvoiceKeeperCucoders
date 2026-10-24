@@ -11,6 +11,7 @@ from app.domain.clock import Clock
 from app.domain.errors import Conflict, Forbidden, NotFound
 from app.infrastructure.security import hash_password
 from app.models import Role, User
+from app.repositories.teams import TeamRepository
 from app.repositories.users import SessionRepository, UserRepository
 from app.services.audit import AuditService, user_snapshot
 
@@ -25,8 +26,8 @@ class UserService:
         self.users = UserRepository(db)
         self.sessions = SessionRepository(db)
 
-    def list(self) -> list[User]:
-        return self.users.list_regular()
+    def list(self, team_id: uuid.UUID | None = None) -> list[User]:
+        return self.users.list_regular(team_id)
 
     def _ensure_login_free(self, login: str, exclude: uuid.UUID | None = None) -> None:
         if login.lower() == self.settings.admin_login.lower():
@@ -42,19 +43,30 @@ class UserService:
         if existing is not None and existing.id != exclude:
             raise Conflict("Этот Telegram-аккаунт уже привязан к другому пользователю", code="telegram_taken")
 
-    def _get_manageable(self, user_id: uuid.UUID) -> User:
+    def _get_manageable(self, user_id: uuid.UUID, team_id: uuid.UUID | None = None) -> User:
         user = self.users.get(user_id)
-        if user is None:
+        if user is None or (team_id is not None and user.team_id != team_id):
             raise NotFound("Пользователь не найден")
         if user.is_system:
             raise Forbidden("Системный администратор управляется только через .env", code="system_user")
         return user
 
-    def create(self, *, login: str, password: str, email: str | None = None, telegram_user_id: int | None = None) -> User:
+    def create(
+        self,
+        *,
+        login: str,
+        password: str,
+        email: str | None = None,
+        telegram_user_id: int | None = None,
+        team_id: uuid.UUID | None = None,
+    ) -> User:
         self._ensure_login_free(login)
         self._ensure_telegram_free(telegram_user_id)
+        if team_id is None:
+            team_id = TeamRepository(self.db).ensure_primary().id
         user = self.users.add(
             User(
+                team_id=team_id,
                 login=login,
                 password_hash=hash_password(password),
                 role=Role.USER,  # через API создаётся только обычный пользователь
@@ -71,12 +83,13 @@ class UserService:
         self,
         user_id: uuid.UUID,
         *,
+        team_id: uuid.UUID | None = None,
         login=_UNSET,
         password=_UNSET,
         email=_UNSET,
         telegram_user_id=_UNSET,
     ) -> User:
-        user = self._get_manageable(user_id)
+        user = self._get_manageable(user_id, team_id)
         before = user_snapshot(user)
         revoke = False
         if login is not _UNSET and login != user.login:
@@ -99,8 +112,8 @@ class UserService:
         self.db.commit()
         return user
 
-    def delete(self, user_id: uuid.UUID) -> None:
-        user = self._get_manageable(user_id)
+    def delete(self, user_id: uuid.UUID, team_id: uuid.UUID | None = None) -> None:
+        user = self._get_manageable(user_id, team_id)
         now = self.clock.now()
         user.deleted_at = now
         self.sessions.revoke_all_for_user(user.id, now)

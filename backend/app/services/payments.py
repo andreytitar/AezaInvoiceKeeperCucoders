@@ -17,6 +17,7 @@ from app.infrastructure.channels.base import ChannelRegistry
 from app.models import RecurringPayment, User
 from app.repositories.deliveries import DeliveryRepository
 from app.repositories.payments import OccurrenceRepository, PaymentRepository
+from app.repositories.teams import TeamRepository
 from app.services.occurrences import OccurrenceGenerator
 from app.services.audit import AuditService, payment_snapshot
 from app.services.reminders import ReminderService
@@ -34,11 +35,11 @@ class PaymentService:
         self.occurrences = OccurrenceRepository(db)
         self.deliveries = DeliveryRepository(db)
 
-    def list(self, include_deleted: bool = False) -> list[RecurringPayment]:
-        return self.payments.list(include_deleted)
+    def list(self, include_deleted: bool = False, team_id: uuid.UUID | None = None) -> list[RecurringPayment]:
+        return self.payments.list(include_deleted, team_id=team_id)
 
-    def get(self, payment_id: uuid.UUID) -> RecurringPayment:
-        p = self.payments.get(payment_id, include_deleted=True)
+    def get(self, payment_id: uuid.UUID, team_id: uuid.UUID | None = None) -> RecurringPayment:
+        p = self.payments.get(payment_id, include_deleted=True, team_id=team_id)
         if p is None:
             raise NotFound("Регулярный платёж не найден")
         return p
@@ -59,8 +60,10 @@ class PaymentService:
                 "Дата ближайшей оплаты должна быть не раньше чем год назад и не позже чем через 5 лет",
                 details={"field": "first_due_date"},
             )
+        team_id = actor.team_id if actor is not None else TeamRepository(self.db).ensure_primary().id
         payment = self.payments.add(
             RecurringPayment(
+                team_id=team_id,
                 title=title,
                 amount=amount,
                 currency=currency,
@@ -86,7 +89,7 @@ class PaymentService:
     def update(self, payment_id: uuid.UUID, fields: dict, actor: User | None = None) -> tuple[RecurringPayment, int]:
         """Изменение названия, суммы, валюты. Прошлые и оплаченные периоды не меняются (снимки),
         неоплаченные со сроком сегодня и позже получают новые значения."""
-        payment = self.payments.get(payment_id)
+        payment = self.payments.get(payment_id, team_id=actor.team_id if actor is not None else None)
         if payment is None:
             raise NotFound("Регулярный платёж не найден")
         before = payment_snapshot(payment)
@@ -110,7 +113,7 @@ class PaymentService:
     def delete(self, payment_id: uuid.UUID, actor: User | None = None) -> RecurringPayment:
         """Прекращение: новые периоды не создаются, напоминаний больше нет, история сохраняется.
         Будущие неоплаченные периоды удаляются. Повторный DELETE -> 404."""
-        payment = self.payments.get(payment_id)
+        payment = self.payments.get(payment_id, team_id=actor.team_id if actor is not None else None)
         if payment is None:
             raise NotFound("Регулярный платёж не найден")
         before = payment_snapshot(payment)
