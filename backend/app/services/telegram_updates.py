@@ -20,6 +20,9 @@ from app.infrastructure.channels.telegram import TelegramClient, TelegramError
 from app.infrastructure.request_context import RequestContext, request_context
 from app.models import TelegramUpdatesOffset
 from app.repositories.users import UserRepository
+from app.domain.phrase import parse_payment_phrase
+from app.services.payments import PaymentService
+from app.services.reminders import dispatch_now
 from app.services.bot_answers import HELP, BotAnswers, command_for_text
 from app.services.occurrences import OccurrenceService
 from app.services.telegram_link import TelegramLinkService, get_bound_chat
@@ -27,7 +30,8 @@ from app.services.telegram_link import TelegramLinkService, get_bound_chat
 log = logging.getLogger("app.telegram.updates")
 
 CALLBACK_PAID = "paid:"  # под напоминанием: сообщение редактируется
-CALLBACK_LIST_PAID = "lp:"  # под ответом на /topay и т. п.: отдельное сообщение
+CALLBACK_LIST_PAID = "lp:"
+CALLBACK_UNDO = "undo:"  # удалить платёж, только что добавленный через /add  # под ответом на /topay и т. п.: отдельное сообщение
 
 
 def paid_callback(occurrence_id: uuid.UUID) -> str:
@@ -60,6 +64,12 @@ class TelegramUpdateHandler:
         if not cq:
             return
         data = cq.get("data") or ""
+        if data.startswith(CALLBACK_UNDO):
+            try:
+                await self._undo_add(cq, uuid.UUID(data[len(CALLBACK_UNDO):]))
+            except ValueError:
+                await self._answer(cq, "Некорректная кнопка", alert=True)
+            return
         from_list = data.startswith(CALLBACK_LIST_PAID)
         prefix = CALLBACK_LIST_PAID if from_list else CALLBACK_PAID
         if not data.startswith(prefix):
@@ -182,12 +192,68 @@ class TelegramUpdateHandler:
                     )
                     return
                 if cmd == "add":
-                    adder = self.c.extras.get("telegram_add_handler")
-                    if adder:
-                        await adder(self, db, user, chat_id, args, msg.get("message_id"))
+                    await self._cmd_add(db, user, chat_id, args, msg.get("message_id"))
                     return
                 answer = getattr(BotAnswers(db, self.c.clock), cmd)()
             await self._send(chat_id, answer.text, answer.reply_markup())
+
+    async def _cmd_add(self, db, user, chat_id, text: str, reply_to) -> None:
+        if user is None or user.role != "admin":
+            await self._send(chat_id, "Добавлять платежи может только администратор с привязанным Telegram.", reply_to=reply_to)
+            return
+        if not text:
+            await self._send(chat_id, "Пример: <code>/add аренда 55000 руб каждое 5-е</code>", reply_to=reply_to)
+            return
+        token = request_context.set(RequestContext(user_agent="telegram-bot", actor_id=user.id, actor_login=user.login))
+        try:
+            parsed = parse_payment_phrase(text, self.c.clock.today())
+            payment = PaymentService(db, self.c.clock, self.c.settings, self.c.channels).create(
+                title=parsed.title,
+                amount=parsed.amount,
+                currency=parsed.currency,
+                first_due_date=parsed.first_due_date,
+                recurrence=parsed.recurrence,
+                actor=user,
+            )
+        except DomainError as exc:
+            await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}", reply_to=reply_to)
+            return
+        finally:
+            request_context.reset(token)
+        rec = {"monthly": "ежемесячно", "weekly": "еженедельно", "quarterly": "ежеквартально", "yearly": "ежегодно"}
+        await self._send(
+            chat_id,
+            "Добавлен платёж:\n"
+            f"<b>{html.escape(payment.title)}</b> — {html.escape(format_amount(payment.amount, payment.currency))} "
+            f"({payment.currency.value}), {rec[payment.recurrence.value]}, ближайшая оплата "
+            f"{payment.first_due_date:%d.%m.%Y}.",
+            reply_markup={"inline_keyboard": [[{"text": "Удалить этот платёж", "callback_data": f"{CALLBACK_UNDO}{payment.id}"}]]},
+            reply_to=reply_to,
+        )
+        await dispatch_now(self.c)  # срок близко — напоминание сразу
+
+    async def _undo_add(self, cq: dict, payment_id: uuid.UUID) -> None:
+        tg_id = (cq.get("from") or {}).get("id")
+        with self.c.session_factory() as db:
+            user = UserRepository(db).get_by_telegram_id(int(tg_id)) if tg_id else None
+            if user is None or user.role != "admin":
+                await self._answer(cq, "Удалять платежи может только администратор", alert=True)
+                return
+            try:
+                p = PaymentService(db, self.c.clock, self.c.settings).delete(payment_id, actor=user)
+            except DomainError as exc:
+                await self._answer(cq, exc.message, alert=True)
+                return
+            title = p.title
+        await self._answer(cq, "Платёж удалён")
+        msg = cq.get("message") or {}
+        if msg.get("message_id") and (msg.get("chat") or {}).get("id") is not None:
+            try:
+                await self.client.edit_message_text(
+                    msg["chat"]["id"], msg["message_id"], f"Платёж <s>{html.escape(title)}</s> удалён."
+                )
+            except TelegramError:
+                pass
 
     async def _cmd_start(self, chat_id, tg_id, code: str, private: bool) -> None:
         if not code:

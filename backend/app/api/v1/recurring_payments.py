@@ -7,6 +7,10 @@ from fastapi import APIRouter, BackgroundTasks, Query, Response, status
 from app.api.deps import AdminDep, ContainerDep, DbDep, UserDep
 from app.api.errors import responses
 from app.schemas.payments import RecurringPaymentCreate, RecurringPaymentOut, RecurringPaymentUpdate
+from pydantic import Field
+
+from app.domain.phrase import parse_payment_phrase
+from app.schemas.common import InputModel
 from app.services.payments import PaymentService
 from app.services.reminders import dispatch_now
 
@@ -42,6 +46,25 @@ def create_payment(
     payment = svc.create(**body.model_dump(), actor=admin)
     background.add_task(dispatch_now, c)
     return RecurringPaymentOut.build(payment, svc.next_due_dates([payment.id])[payment.id])
+
+
+class ParseRequest(InputModel):
+    text: str = Field(min_length=3, max_length=300, examples=["аренда 55000 руб каждое 5-е"])
+
+
+@router.post(
+    "/parse",
+    response_model=RecurringPaymentCreate,
+    summary="Разобрать фразу в платёж (admin, без сохранения)",
+    description="«аренда 55000 руб каждое 5-е», «сервер $25 28 числа», «домен 12 usd ежегодно 01.12». "
+    "Возвращает поля для POST /recurring-payments.",
+    responses=responses(401, 403, 422),
+)
+def parse_phrase(body: ParseRequest, _: AdminDep, c: ContainerDep) -> RecurringPaymentCreate:
+    p = parse_payment_phrase(body.text, c.clock.today())
+    return RecurringPaymentCreate(
+        title=p.title, amount=p.amount, currency=p.currency, first_due_date=p.first_due_date, recurrence=p.recurrence
+    )
 
 
 @router.patch(

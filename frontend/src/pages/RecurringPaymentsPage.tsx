@@ -23,6 +23,20 @@ export function RecurringPaymentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<RecurringPayment | null>(null)
   const [editing, setEditing] = useState<RecurringPayment | null>(null)
+  const [phrase, setPhrase] = useState('')
+
+  const parsePhrase = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    try {
+      const p = unwrap(await api.POST('/api/v1/recurring-payments/parse', { body: { text: phrase } }))
+      setEditing(null)
+      setForm({ title: p.title, amount: String(p.amount), currency: p.currency, first_due_date: p.first_due_date, recurrence: p.recurrence ?? 'monthly' })
+      toast('ok', 'Проверьте поля и нажмите «Добавить»')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка')
+    }
+  }
 
   const startEdit = (p: RecurringPayment) => {
     setEditing(p)
@@ -97,6 +111,15 @@ export function RecurringPaymentsPage() {
     <>
       <PageTitle>Регулярные платежи</PageTitle>
       <div className="grid lg:grid-cols-[22rem_1fr] gap-6 items-start">
+        <div className="space-y-4">
+        <form onSubmit={parsePhrase} className="sheet p-5" aria-labelledby="quick-add">
+          <h2 id="quick-add" className="font-serif text-lg font-bold mb-1">Быстро фразой</h2>
+          <p className="text-xs text-ink-soft mb-2">То же умеет бот: <span className="num">/add аренда 55000 руб каждое 5-е</span></p>
+          <div className="flex gap-2">
+            <input className="field" placeholder="сервер $25 28 числа" value={phrase} onChange={(e) => setPhrase(e.target.value)} aria-label="Фраза" />
+            <button className="btn" disabled={phrase.trim().length < 3}>Разобрать</button>
+          </div>
+        </form>
         <form onSubmit={submit} className="sheet p-5" aria-labelledby="new-payment">
           <h2 id="new-payment" className="font-serif text-lg font-bold mb-3">
             {editing ? `Изменить «${editing.title}»` : 'Новый платёж'}
@@ -187,6 +210,7 @@ export function RecurringPaymentsPage() {
             )}
           </div>
         </form>
+        </div>
 
         <div>
           <label className="inline-flex items-center gap-2 text-sm mb-2">

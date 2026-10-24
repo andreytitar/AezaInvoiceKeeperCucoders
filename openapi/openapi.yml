@@ -177,7 +177,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RecurringPaymentCreate'
+              $ref: '#/components/schemas/RecurringPaymentCreate-Input'
       responses:
         '201':
           description: Successful Response
@@ -203,6 +203,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/recurring-payments/parse:
+    post:
+      tags:
+      - recurring-payments
+      summary: Разобрать фразу в платёж (admin, без сохранения)
+      description: «аренда 55000 руб каждое 5-е», «сервер $25 28 числа», «домен 12 usd ежегодно 01.12». Возвращает поля для
+        POST /recurring-payments.
+      operationId: parse_phrase_api_v1_recurring_payments_parse_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentCreate-Output'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
   /api/v1/recurring-payments/{payment_id}:
     patch:
       tags:
@@ -2421,6 +2462,20 @@ components:
       - status
       title: OccurrencePatch
       description: Меняются только статус и фактическая дата оплаты. Дата — только вместе со статусом `paid`.
+    ParseRequest:
+      properties:
+        text:
+          type: string
+          maxLength: 300
+          minLength: 3
+          title: Text
+          examples:
+          - аренда 55000 руб каждое 5-е
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: ParseRequest
     PaymentStatus:
       type: string
       enum:
@@ -2480,7 +2535,7 @@ components:
       - quarterly
       - yearly
       title: Recurrence
-    RecurringPaymentCreate:
+    RecurringPaymentCreate-Input:
       properties:
         title:
           type: string
@@ -2494,6 +2549,39 @@ components:
           - type: number
             exclusiveMinimum: 0.0
           - type: string
+          title: Amount
+          description: Сумма, не больше 2 знаков после запятой
+          examples:
+          - '55000.00'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        first_due_date:
+          type: string
+          format: date
+          title: First Due Date
+          description: Дата ближайшей оплаты; от её числа считаются следующие сроки
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+          default: monthly
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - amount
+      - currency
+      - first_due_date
+      title: RecurringPaymentCreate
+    RecurringPaymentCreate-Output:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+          examples:
+          - Аренда офиса
+        amount:
+          type: string
           title: Amount
           description: Сумма, не больше 2 знаков после запятой
           examples:

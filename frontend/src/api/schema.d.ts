@@ -113,6 +113,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recurring-payments/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Разобрать фразу в платёж (admin, без сохранения)
+         * @description «аренда 55000 руб каждое 5-е», «сервер $25 28 числа», «домен 12 usd ежегодно 01.12». Возвращает поля для POST /recurring-payments.
+         */
+        post: operations["parse_phrase_api_v1_recurring_payments_parse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recurring-payments/{payment_id}": {
         parameters: {
             query?: never;
@@ -965,6 +985,14 @@ export interface components {
              */
             paid_date?: string | null;
         };
+        /** ParseRequest */
+        ParseRequest: {
+            /**
+             * Text
+             * @example аренда 55000 руб каждое 5-е
+             */
+            text: string;
+        };
         /**
          * PaymentStatus
          * @enum {string}
@@ -999,7 +1027,7 @@ export interface components {
          */
         Recurrence: "monthly" | "weekly" | "quarterly" | "yearly";
         /** RecurringPaymentCreate */
-        RecurringPaymentCreate: {
+        "RecurringPaymentCreate-Input": {
             /**
              * Title
              * @example Аренда офиса
@@ -1011,6 +1039,29 @@ export interface components {
              * @example 55000.00
              */
             amount: number | string;
+            currency: components["schemas"]["Currency"];
+            /**
+             * First Due Date
+             * Format: date
+             * @description Дата ближайшей оплаты; от её числа считаются следующие сроки
+             */
+            first_due_date: string;
+            /** @default monthly */
+            recurrence: components["schemas"]["Recurrence"];
+        };
+        /** RecurringPaymentCreate */
+        "RecurringPaymentCreate-Output": {
+            /**
+             * Title
+             * @example Аренда офиса
+             */
+            title: string;
+            /**
+             * Amount
+             * @description Сумма, не больше 2 знаков после запятой
+             * @example 55000.00
+             */
+            amount: string;
             currency: components["schemas"]["Currency"];
             /**
              * First Due Date
@@ -1538,7 +1589,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RecurringPaymentCreate"];
+                "application/json": components["schemas"]["RecurringPaymentCreate-Input"];
             };
         };
         responses: {
@@ -1549,6 +1600,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecurringPaymentOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    parse_phrase_api_v1_recurring_payments_parse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringPaymentCreate-Output"];
                 };
             };
             /** @description Не авторизован */
