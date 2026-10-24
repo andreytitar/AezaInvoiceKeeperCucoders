@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session as DbSession
 
 from app.models import DeliveryStatus, NotificationDelivery, PaymentOccurrence
@@ -22,7 +22,7 @@ class DeliveryRepository:
             update(NotificationDelivery)
             .where(
                 NotificationDelivery.occurrence_id == occurrence_id,
-                NotificationDelivery.kind.in_(kinds),
+                or_(NotificationDelivery.kind.in_(kinds), NotificationDelivery.kind.startswith("overdue:")),
                 NotificationDelivery.status.in_((DeliveryStatus.PENDING, DeliveryStatus.FAILED)),
             )
             .values(status=DeliveryStatus.CANCELLED, last_error="cancelled: paid or payment deleted")
@@ -35,7 +35,10 @@ class DeliveryRepository:
             update(NotificationDelivery)
             .where(
                 NotificationDelivery.occurrence_id.in_(occ_ids),
-                NotificationDelivery.kind.in_(("reminder", "payment.overdue")),
+                or_(
+                    NotificationDelivery.kind.in_(("reminder", "payment.overdue")),
+                    NotificationDelivery.kind.startswith("overdue:"),
+                ),
                 NotificationDelivery.status.in_((DeliveryStatus.PENDING, DeliveryStatus.FAILED)),
             )
             .values(status=DeliveryStatus.CANCELLED, last_error="cancelled: payment deleted")

@@ -33,3 +33,10 @@ def test_larger_window_from_settings():
     assert should_remind(
         due_date=date(2026, 10, 31), is_paid=False, payment_deleted=False, today=TODAY, days_before=7
     )
+
+
+def test_overdue_repeat_buckets():
+    from app.domain.reminder_policy import overdue_repeat_bucket
+
+    assert [overdue_repeat_bucket(d, 3, 5) for d in (0, 1, 2, 3, 4, 7, 13, 16)] == [None, 0, 0, 0, 1, 2, 4, None]
+    assert overdue_repeat_bucket(5, 0, 5) is None

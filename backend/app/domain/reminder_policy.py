@@ -25,5 +25,17 @@ def should_remind(
     return due_date <= reminder_window_end(today, days_before)
 
 
+def overdue_repeat_bucket(overdue_days: int, every_days: int, max_repeats: int) -> int | None:
+    """Номер повтора «просрочено» для текущего дня просрочки или None.
+
+    Повторы на 1-й, 1+every-й, 1+2·every-й … день просрочки, не больше max_repeats.
+    Номер — часть ключа доставки, поэтому каждый повтор уходит ровно один раз.
+    """
+    if every_days <= 0 or max_repeats <= 0 or overdue_days < 1:
+        return None
+    bucket = (overdue_days - 1) // every_days
+    return bucket if bucket < max_repeats else None
+
+
 def days_until(due_date: date, today: date) -> int:
     return (due_date - today).days

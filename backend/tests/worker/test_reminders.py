@@ -47,6 +47,7 @@ def test_far_payment_not_reminded_until_three_days_before(admin, container, cloc
 
 
 def test_no_duplicates_on_repeated_checks(admin, container, clock, fake_channel):
+    container.settings.overdue_remind_every_days = 0  # повторы о просрочке проверяются отдельно
     create_payment(admin, first_due_date="2026-10-25")
     for _ in range(3):
         tick(container)

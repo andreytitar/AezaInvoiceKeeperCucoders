@@ -19,7 +19,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
 from app.domain.clock import Clock
-from app.domain.reminder_policy import days_until, reminder_window_end, should_remind
+from app.domain.reminder_policy import days_until, overdue_repeat_bucket, reminder_window_end, should_remind
 from app.infrastructure.channels.base import Action, ChannelRegistry, Notification, SendResult
 from app.models import DeliveryKind, DeliveryStatus, NotificationDelivery, PaymentOccurrence
 from app.repositories.reminders import ReminderRepository
@@ -62,10 +62,32 @@ class ReminderService:
                 for recipient in channel.recipients():
                     if self.repo.enqueue(occ.id, channel.name, recipient, DeliveryKind.REMINDER.value, now):
                         created += 1
+        created += self.scan_overdue_repeats(today, now)
         if commit:
             self.db.commit()
         if created:
             log.info("Поставлено напоминаний в очередь: %s", created)
+        return created
+
+    def scan_overdue_repeats(self, today, now) -> int:
+        """Повторные напоминания о просрочке раз в OVERDUE_REMIND_EVERY_DAYS дней (вебхуки — отдельным событием).
+        Первый повтор не уходит в тот же день, что и основное напоминание."""
+        s = self.settings
+        if s.overdue_remind_every_days <= 0:
+            return 0
+        created = 0
+        for occ in self.repo.candidates(today - timedelta(days=1)):
+            bucket = overdue_repeat_bucket((today - occ.due_date).days, s.overdue_remind_every_days, s.overdue_remind_max)
+            if bucket is None or occ.payment.deleted_at is not None:
+                continue
+            for channel in self.channels.all():
+                if channel.name == "webhook":
+                    continue
+                for recipient in channel.recipients():
+                    if not self.repo.reminder_sent_before(occ.id, channel.name, recipient, now - timedelta(hours=12)):
+                        continue
+                    if self.repo.enqueue(occ.id, channel.name, recipient, f"overdue:{bucket}", now):
+                        created += 1
         return created
 
 
@@ -99,7 +121,7 @@ class DeliveryDispatcher:
         self.on_sent = on_sent  # хук для аудита и т. п. (этап 8)
 
     def build_notification(self, d: NotificationDelivery, occ: PaymentOccurrence) -> Notification:
-        is_reminder = d.kind == DeliveryKind.REMINDER.value
+        is_reminder = d.kind == DeliveryKind.REMINDER.value or d.kind.startswith("overdue:")
         return Notification(
             occurrence_id=occ.id,
             title=occ.title_snapshot,
@@ -120,7 +142,7 @@ class DeliveryDispatcher:
     def _still_relevant(self, d: NotificationDelivery, occ: PaymentOccurrence | None) -> bool:
         if occ is None:
             return False
-        if d.kind in (DeliveryKind.REMINDER.value, "payment.overdue"):
+        if d.kind in (DeliveryKind.REMINDER.value, "payment.overdue") or d.kind.startswith("overdue:"):
             # напоминание и «просрочено» неактуальны, если период оплачен или платёж удалён
             return not occ.is_paid and occ.payment.deleted_at is None
         return True

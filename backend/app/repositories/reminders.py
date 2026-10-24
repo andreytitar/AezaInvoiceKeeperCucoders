@@ -48,6 +48,21 @@ class ReminderRepository:
         )
         return self.db.execute(stmt).first() is not None
 
+    def reminder_sent_before(self, occurrence_id: uuid.UUID, channel: str, recipient: str, before: datetime) -> bool:
+        return (
+            self.db.scalar(
+                select(NotificationDelivery.id).where(
+                    NotificationDelivery.occurrence_id == occurrence_id,
+                    NotificationDelivery.channel == channel,
+                    NotificationDelivery.recipient == recipient,
+                    NotificationDelivery.kind == "reminder",
+                    NotificationDelivery.status == DeliveryStatus.SENT,
+                    NotificationDelivery.sent_at < before,
+                )
+            )
+            is not None
+        )
+
     def claim_batch(self, now: datetime, limit: int) -> list[NotificationDelivery]:
         """Атомарный захват: pending/failed с наступившим next_attempt_at -> sending.
         SKIP LOCKED позволяет нескольким worker'ам работать параллельно без дублей."""
