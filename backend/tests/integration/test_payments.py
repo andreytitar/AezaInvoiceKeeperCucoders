@@ -207,3 +207,23 @@ def test_other_recurrences_via_api(admin):
     y = create_payment(admin, title="Домен", amount="12", currency="USD", first_due_date="2026-12-01", recurrence="yearly")
     assert [o["due_date"] for o in occurrences_of(admin, y["id"])] == ["2026-12-01", "2027-12-01"]
     assert admin.post("/api/v1/recurring-payments", json={"title": "X", "amount": "1", "currency": "RUB", "first_due_date": "2026-11-01", "recurrence": "daily"}).status_code == 422
+
+
+def test_update_payment_keeps_past_and_paid_snapshots(admin, user):
+    p = create_payment(admin, title="Аренда", amount="55000", first_due_date="2026-09-20")
+    occ = occurrences_of(admin, p["id"])  # 20.09 (оплатим), 20.10 (просрочен), 20.11 (будущий)
+    user.patch(f"/api/v1/payment-occurrences/{occ[0]['id']}", json={"status": "paid", "paid_date": "2026-09-19"})
+    r = admin.patch(f"/api/v1/recurring-payments/{p['id']}", json={"title": "Аренда офиса", "amount": "60000.50"})
+    assert r.status_code == 200 and r.json()["amount"] == "60000.50" and r.json()["title"] == "Аренда офиса"
+    after = occurrences_of(admin, p["id"])
+    assert [(o["title"], o["amount"]) for o in after] == [
+        ("Аренда", "55000.00"),  # оплачен — не меняется
+        ("Аренда", "55000.00"),  # прошедший срок — не меняется
+        ("Аренда офиса", "60000.50"),  # будущий неоплаченный — новые значения
+    ]
+    assert admin.patch(f"/api/v1/recurring-payments/{p['id']}", json={"first_due_date": "2026-12-01"}).status_code == 422
+    assert admin.patch(f"/api/v1/recurring-payments/{p['id']}", json={"amount": "-1"}).status_code == 422
+    admin.delete(f"/api/v1/recurring-payments/{p['id']}")
+    assert admin.patch(f"/api/v1/recurring-payments/{p['id']}", json={"amount": "1"}).status_code == 404
+    log = admin.get("/api/v1/audit-logs", params={"action": "payment.update"}).json()["items"][0]
+    assert log["before"]["amount"] == "55000.00" and log["after"]["open_periods_updated"] == 1

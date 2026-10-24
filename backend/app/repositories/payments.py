@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import Select, and_, delete, func, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session as DbSession
 
@@ -119,6 +119,24 @@ class OccurrenceRepository:
         ).all()
         found = {pid: d for pid, d in rows}
         return {pid: found.get(pid) for pid in payment_ids}
+
+    def update_open_snapshots(self, payment: RecurringPayment, today: date) -> int:
+        """Новые название/сумма/валюта — только для неоплаченных периодов со сроком сегодня и позже."""
+        res = self.db.execute(
+            update(PaymentOccurrence)
+            .where(
+                PaymentOccurrence.recurring_payment_id == payment.id,
+                PaymentOccurrence.is_paid.is_(False),
+                PaymentOccurrence.due_date >= today,
+            )
+            .values(
+                title_snapshot=payment.title,
+                amount_snapshot=payment.amount,
+                currency_snapshot=payment.currency,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return res.rowcount or 0
 
     def delete_future_unpaid(self, payment_id: uuid.UUID, today: date) -> int:
         result = self.db.execute(

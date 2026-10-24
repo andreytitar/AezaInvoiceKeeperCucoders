@@ -15,6 +15,7 @@ MATRIX = [
     ("GET", "/api/v1/recurring-payments", None, True),
     ("POST", "/api/v1/recurring-payments", {"title": "T", "amount": "1.00", "currency": "RUB", "first_due_date": "2026-11-01"}, False),
     ("DELETE", f"/api/v1/recurring-payments/{RID}", None, False),
+    ("PATCH", f"/api/v1/recurring-payments/{RID}", {"amount": "60000"}, False),
     ("GET", "/api/v1/payment-occurrences", None, True),
     ("GET", f"/api/v1/payment-occurrences/{RID}", None, True),
     ("PATCH", f"/api/v1/payment-occurrences/{RID}", {"status": "paid"}, True),

@@ -130,7 +130,11 @@ export interface paths {
         delete: operations["delete_payment_api_v1_recurring_payments__payment_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Изменить название, сумму или валюту (admin)
+         * @description Оплаченные и прошедшие периоды сохраняют прежние значения (снимки). Неоплаченные периоды со сроком сегодня и позже получают новые.
+         */
+        patch: operations["update_payment_api_v1_recurring_payments__payment_id__patch"];
         trace?: never;
     };
     "/api/v1/payment-occurrences": {
@@ -924,6 +928,17 @@ export interface components {
             created_at: string;
         };
         /**
+         * RecurringPaymentUpdate
+         * @description Изменение шаблона. Срок и периодичность не меняются: для этого прекратите платёж и создайте новый.
+         */
+        RecurringPaymentUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Amount */
+            amount?: (number | string) | null;
+            currency?: components["schemas"]["Currency"] | null;
+        };
+        /**
          * Role
          * @enum {string}
          */
@@ -1467,6 +1482,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_payment_api_v1_recurring_payments__payment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringPaymentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringPaymentOut"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

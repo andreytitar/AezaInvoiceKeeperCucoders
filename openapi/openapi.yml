@@ -204,6 +204,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/v1/recurring-payments/{payment_id}:
+    patch:
+      tags:
+      - recurring-payments
+      summary: Изменить название, сумму или валюту (admin)
+      description: Оплаченные и прошедшие периоды сохраняют прежние значения (снимки). Неоплаченные периоды со сроком сегодня
+        и позже получают новые.
+      operationId: update_payment_api_v1_recurring_payments__payment_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Payment Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringPaymentUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       tags:
       - recurring-payments
@@ -2310,6 +2364,34 @@ components:
       - deleted_at
       - created_at
       title: RecurringPaymentOut
+    RecurringPaymentUpdate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Title
+        amount:
+          anyOf:
+          - anyOf:
+            - type: number
+              exclusiveMinimum: 0.0
+            - type: string
+            description: Сумма, не больше 2 знаков после запятой
+            examples:
+            - '55000.00'
+          - type: 'null'
+          title: Amount
+        currency:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      title: RecurringPaymentUpdate
+      description: 'Изменение шаблона. Срок и периодичность не меняются: для этого прекратите платёж и создайте новый.'
     Role:
       type: string
       enum:

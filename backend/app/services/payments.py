@@ -83,6 +83,30 @@ class PaymentService:
         if self.channels is not None:
             ReminderService(self.db, self.clock, self.settings, self.channels).scan(payment.id, commit=False)
 
+    def update(self, payment_id: uuid.UUID, fields: dict, actor: User | None = None) -> tuple[RecurringPayment, int]:
+        """Изменение названия, суммы, валюты. Прошлые и оплаченные периоды не меняются (снимки),
+        неоплаченные со сроком сегодня и позже получают новые значения."""
+        payment = self.payments.get(payment_id)
+        if payment is None:
+            raise NotFound("Регулярный платёж не найден")
+        before = payment_snapshot(payment)
+        for key in ("title", "amount", "currency"):
+            if key in fields and fields[key] is not None:
+                setattr(payment, key, fields[key])
+        self.db.flush()
+        updated = self.occurrences.update_open_snapshots(payment, self.clock.today())
+        AuditService(self.db, self.clock).log(
+            "payment.update",
+            entity_type="recurring_payment",
+            entity_id=payment.id,
+            before=before,
+            after={**payment_snapshot(payment), "open_periods_updated": updated},
+            actor=actor,
+        )
+        self.db.commit()
+        self.db.refresh(payment)
+        return payment, updated
+
     def delete(self, payment_id: uuid.UUID, actor: User | None = None) -> RecurringPayment:
         """Прекращение: новые периоды не создаются, напоминаний больше нет, история сохраняется.
         Будущие неоплаченные периоды удаляются. Повторный DELETE -> 404."""

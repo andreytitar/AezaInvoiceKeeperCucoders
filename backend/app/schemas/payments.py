@@ -32,6 +32,14 @@ class RecurringPaymentCreate(InputModel):
     recurrence: Recurrence = Recurrence.MONTHLY
 
 
+class RecurringPaymentUpdate(InputModel):
+    """Изменение шаблона. Срок и периодичность не меняются: для этого прекратите платёж и создайте новый."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    amount: Amount | None = None
+    currency: Currency | None = None
+
+
 class RecurringPaymentOut(OutputModel):
     id: uuid.UUID
     title: str

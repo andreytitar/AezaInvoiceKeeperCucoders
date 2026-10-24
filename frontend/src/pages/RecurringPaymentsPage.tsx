@@ -22,11 +22,41 @@ export function RecurringPaymentsPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<RecurringPayment | null>(null)
+  const [editing, setEditing] = useState<RecurringPayment | null>(null)
+
+  const startEdit = (p: RecurringPayment) => {
+    setEditing(p)
+    setError(null)
+    setForm({ title: p.title, amount: p.amount, currency: p.currency, first_due_date: p.first_due_date, recurrence: p.recurrence })
+  }
+  const cancelEdit = () => {
+    setEditing(null)
+    setForm(empty)
+    setError(null)
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
+    if (editing) {
+      try {
+        const p = unwrap(
+          await api.PATCH('/api/v1/recurring-payments/{payment_id}', {
+            params: { path: { payment_id: editing.id } },
+            body: { title: form.title.trim(), amount: form.amount.replace(',', '.').replace(/\s/g, ''), currency: form.currency as 'RUB' },
+          }),
+        )
+        toast('ok', `«${p.title}» обновлён: новые значения действуют с ближайшего неоплаченного периода`)
+        cancelEdit()
+        list.reload()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Ошибка')
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
     try {
       const p = unwrap(
         await api.POST('/api/v1/recurring-payments', {
@@ -69,8 +99,13 @@ export function RecurringPaymentsPage() {
       <div className="grid lg:grid-cols-[22rem_1fr] gap-6 items-start">
         <form onSubmit={submit} className="sheet p-5" aria-labelledby="new-payment">
           <h2 id="new-payment" className="font-serif text-lg font-bold mb-3">
-            Новый платёж
+            {editing ? `Изменить «${editing.title}»` : 'Новый платёж'}
           </h2>
+          {editing && (
+            <p className="text-xs text-ink-soft mb-3">
+              Оплаченные и прошедшие периоды сохранят прежнюю сумму. Срок и периодичность не меняются.
+            </p>
+          )}
           <label className="label" htmlFor="p-title">
             Название
           </label>
@@ -119,6 +154,7 @@ export function RecurringPaymentsPage() {
             type="date"
             className="field num mb-1"
             required
+            disabled={!!editing}
             value={form.first_due_date}
             onChange={(e) => setForm({ ...form, first_due_date: e.target.value })}
           />
@@ -128,7 +164,7 @@ export function RecurringPaymentsPage() {
           <label className="label" htmlFor="p-rec">
             Периодичность
           </label>
-          <select id="p-rec" className="field mb-4" value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>
+          <select id="p-rec" className="field mb-4" disabled={!!editing} value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>
             {Object.entries(RECURRENCE_NAMES).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
@@ -140,9 +176,16 @@ export function RecurringPaymentsPage() {
               {error}
             </p>
           )}
-          <button className="btn btn-primary w-full justify-center" disabled={busy}>
-            Добавить
-          </button>
+          <div className="flex gap-2">
+            <button className="btn btn-primary flex-1 justify-center" disabled={busy}>
+              {editing ? 'Сохранить' : 'Добавить'}
+            </button>
+            {editing && (
+              <button type="button" className="btn" onClick={cancelEdit}>
+                Отмена
+              </button>
+            )}
+          </div>
         </form>
 
         <div>
@@ -187,9 +230,14 @@ export function RecurringPaymentsPage() {
                       <td className="num text-sm">{p.is_deleted ? '—' : formatDate(p.next_due_date)}</td>
                       <td className="text-right">
                         {!p.is_deleted && (
-                          <button className="btn btn-sm btn-danger" onClick={() => setDeleting(p)}>
-                            Удалить
-                          </button>
+                          <span className="inline-flex gap-1">
+                            <button className="btn btn-sm" onClick={() => startEdit(p)}>
+                              Изменить
+                            </button>
+                            <button className="btn btn-sm btn-danger" onClick={() => setDeleting(p)}>
+                              Удалить
+                            </button>
+                          </span>
                         )}
                       </td>
                     </tr>

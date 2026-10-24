@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Response, status
 
 from app.api.deps import AdminDep, ContainerDep, DbDep, UserDep
 from app.api.errors import responses
-from app.schemas.payments import RecurringPaymentCreate, RecurringPaymentOut
+from app.schemas.payments import RecurringPaymentCreate, RecurringPaymentOut, RecurringPaymentUpdate
 from app.services.payments import PaymentService
 from app.services.reminders import dispatch_now
 
@@ -41,6 +41,22 @@ def create_payment(
     svc = PaymentService(db, c.clock, c.settings, c.channels)
     payment = svc.create(**body.model_dump(), actor=admin)
     background.add_task(dispatch_now, c)
+    return RecurringPaymentOut.build(payment, svc.next_due_dates([payment.id])[payment.id])
+
+
+@router.patch(
+    "/{payment_id}",
+    response_model=RecurringPaymentOut,
+    summary="Изменить название, сумму или валюту (admin)",
+    description="Оплаченные и прошедшие периоды сохраняют прежние значения (снимки). Неоплаченные периоды "
+    "со сроком сегодня и позже получают новые.",
+    responses=responses(401, 403, 404, 422),
+)
+def update_payment(
+    payment_id: uuid.UUID, body: RecurringPaymentUpdate, admin: AdminDep, c: ContainerDep, db: DbDep
+) -> RecurringPaymentOut:
+    svc = PaymentService(db, c.clock, c.settings)
+    payment, _ = svc.update(payment_id, body.model_dump(exclude_unset=True), actor=admin)
     return RecurringPaymentOut.build(payment, svc.next_due_dates([payment.id])[payment.id])
 
 
