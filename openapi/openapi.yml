@@ -1775,6 +1775,78 @@ paths:
           description: Файл больше 5 МБ
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/calendar/feed:
+    get:
+      tags:
+      - calendar
+      summary: Личная ссылка на календарь (ICS) для Google/Apple Календаря
+      operationId: get_feed_api_v1_calendar_feed_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/calendar/feed/rotate:
+    post:
+      tags:
+      - calendar
+      summary: Сменить ссылку на календарь (старая перестанет работать)
+      operationId: rotate_feed_api_v1_calendar_feed_rotate_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedOut'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/calendar/{token}.ics:
+    get:
+      tags:
+      - calendar
+      summary: Календарь платежей в формате iCalendar (доступ по секретной ссылке)
+      operationId: ics_api_v1_calendar__token__ics_get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/calendar: {}
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     AuditLogOut:
@@ -2252,6 +2324,19 @@ components:
       required:
       - error
       title: ErrorResponse
+    FeedOut:
+      properties:
+        url:
+          type: string
+          title: Url
+        webcal_url:
+          type: string
+          title: Webcal Url
+      type: object
+      required:
+      - url
+      - webcal_url
+      title: FeedOut
     FiscalOut:
       properties:
         date:

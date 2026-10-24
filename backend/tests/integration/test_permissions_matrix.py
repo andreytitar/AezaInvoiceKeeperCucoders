@@ -29,6 +29,8 @@ MATRIX = [
     ("GET", f"/api/v1/payment-occurrences/{RID}/receipt/file", None, True),
     ("GET", "/api/v1/budgets", None, True),
     ("POST", "/api/v1/receipts/scan", None, True),
+    ("GET", "/api/v1/calendar/feed", None, True),
+    ("POST", "/api/v1/calendar/feed/rotate", None, True),
     ("GET", "/api/v1/budgets/report?year=2026&month=10", None, True),
     ("PUT", "/api/v1/budgets", {"period_type": "month", "year": 2026, "month": 10, "currency": "RUB", "planned_amount": "100.00"}, False),
     ("DELETE", f"/api/v1/budgets/{RID}", None, False),

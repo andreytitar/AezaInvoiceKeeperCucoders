@@ -34,6 +34,14 @@ export function CalendarPage() {
   const [paying, setPaying] = useState<Occurrence | null>(null)
   const [busy, setBusy] = useState(false)
   const [asOf, setAsOf] = useState('')
+  const [feed, setFeed] = useState<{ url: string; webcal_url: string } | null>(null)
+  const openFeed = async (rotate = false) => {
+    try {
+      setFeed(unwrap(rotate ? await api.POST('/api/v1/calendar/feed/rotate') : await api.GET('/api/v1/calendar/feed')))
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'Ошибка')
+    }
+  }
   // «сегодня» сервера (APP_FAKE_TODAY) определяет стартовый месяц
   useEffect(() => {
     const t = parseISODate(today)
@@ -97,6 +105,9 @@ export function CalendarPage() {
             <button className="btn btn-sm" onClick={() => shift(1)} aria-label="Следующий месяц">→</button>
             <button className="btn btn-sm btn-ghost" onClick={() => setMonth(new Date(parseISODate(today).getFullYear(), parseISODate(today).getMonth(), 1))}>
               Сегодня
+            </button>
+            <button className="btn btn-sm" onClick={() => openFeed()}>
+              В календарь телефона
             </button>
           </div>
         }
@@ -165,6 +176,32 @@ export function CalendarPage() {
             })}
           </div>
         </div>
+      )}
+
+      {feed && (
+        <section className="sheet p-4 mt-4 fade-in" aria-label="Подписка на календарь">
+          <div className="flex justify-between items-start gap-3">
+            <div className="min-w-0">
+              <h2 className="font-serif text-lg font-bold">Календарь в телефоне</h2>
+              <p className="text-sm text-ink-soft mt-1">
+                Все сроки появятся в Google или Apple Календаре с напоминанием за 3 дня и в день оплаты; обновляется
+                автоматически. Ссылка личная — не пересылайте её.
+              </p>
+            </div>
+            <button className="btn btn-sm btn-ghost" onClick={() => setFeed(null)} aria-label="Закрыть">✕</button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <a className="btn btn-sm btn-primary" href={feed.webcal_url}>Открыть в Календаре (iPhone, Mac)</a>
+            <a className="btn btn-sm" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feed.webcal_url)}`} target="_blank" rel="noopener">
+              Google Календарь
+            </a>
+            <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(feed.url).then(() => toast('ok', 'Ссылка скопирована'))}>
+              Скопировать ссылку
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={() => openFeed(true)}>Сменить ссылку</button>
+          </div>
+          <code className="num text-xs break-all block mt-2 text-ink-soft">{feed.url}</code>
+        </section>
       )}
 
       <section className="mt-8" aria-labelledby="asof-title">

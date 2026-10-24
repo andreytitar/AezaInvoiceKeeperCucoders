@@ -75,6 +75,7 @@ class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
         Index("uq_users_login_alive", "login", unique=True, postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("calendar_token", name="uq_users_calendar_token"),
         Index(
             "uq_users_telegram_alive",
             "telegram_user_id",
@@ -90,6 +91,7 @@ class User(TimestampMixin, Base):
     is_system: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    calendar_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
