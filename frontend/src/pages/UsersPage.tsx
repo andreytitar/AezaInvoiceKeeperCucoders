@@ -1,6 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { api, unwrap, type User } from '../api/client'
-import { ConfirmDialog, Empty, ErrorNote, Loading, PageTitle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  Dialog,
+  EmptyState,
+  ErrorNote,
+  Input,
+  Loading,
+  Menu,
+  MenuItem,
+  PageTitle,
+  Table,
+} from '../components/ui'
+import { Icon } from '../components/Icon'
 import { useLoad } from '../hooks/useLoad'
 import { formatDate } from '../i18n/format'
 import { useToast } from '../store/toast'
@@ -16,14 +31,22 @@ export function UsersPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<User | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
 
   const startEdit = (u: User) => {
     setEditing(u)
+    setFormOpen(true)
     setError(null)
-    setForm({ login: u.login, password: '', email: u.email ?? '', telegram_user_id: u.telegram_user_id ? String(u.telegram_user_id) : '' })
+    setForm({
+      login: u.login,
+      password: '',
+      email: u.email ?? '',
+      telegram_user_id: u.telegram_user_id ? String(u.telegram_user_id) : '',
+    })
   }
   const cancelEdit = () => {
     setEditing(null)
+    setFormOpen(false)
     setForm(EMPTY)
     setError(null)
   }
@@ -50,6 +73,7 @@ export function UsersPage() {
         )
         toast('ok', `Пользователь ${form.login} создан`)
         setForm(EMPTY)
+        setFormOpen(false)
       }
       list.reload()
     } catch (err) {
@@ -74,143 +98,191 @@ export function UsersPage() {
     }
   }
 
+  const actions = (u: User) => (
+    <Menu label={`Действия: ${u.login}`}>
+      <MenuItem onClick={() => startEdit(u)}>
+        <Icon name="edit" /> Изменить
+      </MenuItem>
+      <MenuItem danger onClick={() => setDeleting(u)}>
+        <Icon name="trash" /> Удалить
+      </MenuItem>
+    </Menu>
+  )
+
   return (
     <>
-      <div className="win-window min-w-0 max-w-full">
-        <div className="win-titlebar">Пользователи</div>
-        <div className="min-w-0 bg-paper-2 px-2 pt-2 pb-3 text-ink">
-      <PageTitle hideTitleOnDesk>Пользователи</PageTitle>
-      <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 items-start">
-        <form onSubmit={submit} className="sheet p-5">
-          <h2 className="font-sans text-lg font-semibold mb-3">{editing ? `Изменить ${editing.login}` : 'Новый пользователь'}</h2>
-          <label className="label" htmlFor="u-login">
-            Логин
-          </label>
-          <input
-            id="u-login"
-            className="field mb-3"
-            required
-            minLength={3}
-            maxLength={64}
-            pattern="[A-Za-z0-9_.\-]+"
-            title="Латиница, цифры, точка, дефис, подчёркивание"
-            value={form.login}
-            onChange={(e) => setForm({ ...form, login: e.target.value })}
+      <PageTitle
+        aside={
+          <Button
+            variant="primary"
+            onClick={() => {
+              cancelEdit()
+              setFormOpen(true)
+            }}
+          >
+            <Icon name="plus" /> Новый пользователь
+          </Button>
+        }
+      >
+        Пользователи
+      </PageTitle>
+      <p className="mb-5 text-sm text-ink-soft">
+        Доступ к платежам команды. Администратор из настроек сервера в списке не отображается.
+      </p>
+      <Card className="min-w-0">
+        {list.error ? (
+          <div className="p-4">
+            <ErrorNote text={list.error} onRetry={list.reload} />
+          </div>
+        ) : !list.data ? (
+          <Loading />
+        ) : !list.data.length ? (
+          <EmptyState
+            title="Пользователей пока нет"
+            hint="Создайте учётную запись для участника команды."
+            icon={<Icon name="users" />}
           />
-          <label className="label" htmlFor="u-pass">
-            {editing ? 'Новый пароль (необязательно)' : 'Пароль'}
-          </label>
-          <input
-            id="u-pass"
-            type="password"
-            className="field mb-3"
-            autoComplete="new-password"
-            required={!editing}
-            minLength={6}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-          <label className="label" htmlFor="u-email">
-            Email (необязательно)
-          </label>
-          <input id="u-email" type="email" className="field mb-3" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <label className="label" htmlFor="u-tg">
-            Telegram user ID (необязательно)
-          </label>
-          <input
-            id="u-tg"
-            className="field num mb-1"
-            inputMode="numeric"
-            pattern="\d*"
-            value={form.telegram_user_id}
-            onChange={(e) => setForm({ ...form, telegram_user_id: e.target.value })}
-          />
-          <p className="text-xs text-ink-soft mb-4">Нужен, чтобы отмечать оплату кнопкой в Telegram. Узнать id: бот @userinfobot.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-rule min-[1100px]:hidden">
+              {list.data.map((u) => (
+                <li key={u.id} className="min-w-0 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold">{u.login}</p>
+                      <div className="mt-2">
+                        <Badge tone={u.role === 'admin' ? 'accent' : 'neutral'}>
+                          {u.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                        </Badge>
+                      </div>
+                    </div>
+                    {actions(u)}
+                  </div>
+                  <dl className="mt-4 space-y-2 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-ink-soft">Email</dt>
+                      <dd className="min-w-0 break-all">{u.email ?? '—'}</dd>
+                    </div>
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-ink-soft">Telegram ID</dt>
+                      <dd className="num whitespace-nowrap">{u.telegram_user_id ?? '—'}</dd>
+                    </div>
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-ink-soft">Создан</dt>
+                      <dd className="num whitespace-nowrap">{formatDate(u.created_at.slice(0, 10))}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <Table className="hidden w-full min-[1100px]:table">
+              <thead>
+                <tr>
+                  <th>Пользователь</th>
+                  <th>Email</th>
+                  <th>Telegram ID</th>
+                  <th>Создан</th>
+                  <th>
+                    <span className="sr-only">Действия</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <p className="font-semibold [overflow-wrap:anywhere]">{u.login}</p>
+                      <div className="mt-1.5">
+                        <Badge tone={u.role === 'admin' ? 'accent' : 'neutral'}>
+                          {u.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="max-w-56 break-all text-sm">{u.email ?? '—'}</td>
+                    <td className="num whitespace-nowrap text-sm">{u.telegram_user_id ?? '—'}</td>
+                    <td className="num whitespace-nowrap text-sm">{formatDate(u.created_at.slice(0, 10))}</td>
+                    <td className="text-right">{actions(u)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </>
+        )}
+      </Card>
+      <Dialog open={formOpen} onClose={cancelEdit} title={editing ? `Изменить ${editing.login}` : 'Новый пользователь'}>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="label" htmlFor="u-login">
+              Логин
+            </label>
+            <Input
+              id="u-login"
+              required
+              minLength={3}
+              maxLength={64}
+              pattern="[A-Za-z0-9_.\-]+"
+              title="Латиница, цифры, точка, дефис, подчёркивание"
+              value={form.login}
+              onChange={(e) => setForm({ ...form, login: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="u-pass">
+              {editing ? 'Новый пароль (необязательно)' : 'Пароль'}
+            </label>
+            <Input
+              id="u-pass"
+              type="password"
+              autoComplete="new-password"
+              required={!editing}
+              minLength={6}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+            {editing && <p className="mt-2 text-xs text-ink-soft">Смена пароля завершит все сессии пользователя.</p>}
+          </div>
+          <div>
+            <label className="label" htmlFor="u-email">
+              Email (необязательно)
+            </label>
+            <Input
+              id="u-email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="u-tg">
+              Telegram user ID (необязательно)
+            </label>
+            <Input
+              id="u-tg"
+              className="num"
+              inputMode="numeric"
+              pattern="\d*"
+              value={form.telegram_user_id}
+              onChange={(e) => setForm({ ...form, telegram_user_id: e.target.value })}
+            />
+            <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+              Для отметки оплаты в Telegram. Узнать ID можно у бота @userinfobot.
+            </p>
+          </div>
           {error && (
-            <p className="text-sm text-ink mb-3" role="alert">
+            <p className="text-sm text-overdue" role="alert">
               {error}
             </p>
           )}
-          <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" disabled={busy}>
-              {editing ? 'Сохранить' : 'Создать'}
-            </button>
-            {editing && (
-              <button type="button" className="btn" onClick={cancelEdit}>
-                Отмена
-              </button>
-            )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={cancelEdit} disabled={busy}>
+              Отмена
+            </Button>
+            <Button type="submit" variant="primary" loading={busy}>
+              {editing ? 'Сохранить' : 'Создать пользователя'}
+            </Button>
           </div>
         </form>
-
-        <div className="sheet min-w-0">
-          {list.error ? (
-            <div className="p-4">
-              <ErrorNote text={list.error} onRetry={list.reload} />
-            </div>
-          ) : !list.data ? (
-            <Loading />
-          ) : list.data.length === 0 ? (
-            <Empty title="Пользователей нет" hint="Администратор из .env здесь не показывается" />
-          ) : (
-            <>
-              <ul className="hand-only px-3">
-                {list.data.map((u) => (
-                  <li key={u.id} className="slip">
-                    <div className="slip-row">
-                      <span className="font-semibold min-w-0">{u.login}</span>
-                      <span className="num text-sm">{formatDate(u.created_at.slice(0, 10))}</span>
-                    </div>
-                    <div className="slip-row text-sm">
-                      <span className="min-w-0 break-all">{u.email ?? '—'}</span>
-                      <span className="num">{u.telegram_user_id ?? '—'}</span>
-                    </div>
-                    <div className="slip-row">
-                      <button className="btn" onClick={() => startEdit(u)}>Изменить</button>
-                      <button className="btn" onClick={() => setDeleting(u)}>Удалить</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <table className="ledger desk-only w-full table-fixed">
-                <thead>
-                  <tr>
-                    <th>Логин</th>
-                    <th>Email</th>
-                    <th>Telegram</th>
-                    <th>Создан</th>
-                    <th className="text-right">
-                      <span className="sr-only">Действия</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.data.map((u) => (
-                    <tr key={u.id}>
-                      <td className="font-semibold">{u.login}</td>
-                      <td className="text-sm break-all">{u.email ?? '—'}</td>
-                      <td className="num text-sm">{u.telegram_user_id ?? '—'}</td>
-                      <td className="num text-sm">{formatDate(u.created_at.slice(0, 10))}</td>
-                      <td className="text-right">
-                        <span className="inline-flex flex-wrap justify-end gap-1">
-                          <button className="btn whitespace-normal" onClick={() => startEdit(u)}>
-                            Изменить
-                          </button>
-                          <button className="btn whitespace-normal" onClick={() => setDeleting(u)}>
-                            Удалить
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-        </div>
-      </div>
-        </div>
-      </div>
+      </Dialog>
       <ConfirmDialog
         open={!!deleting}
         title="Удалить пользователя?"

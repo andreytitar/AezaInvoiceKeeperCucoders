@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, unwrap, type Schemas } from '../api/client'
-import { ErrorNote, Loading, PageTitle } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Input, Loading, PageTitle, Tabs } from '../components/ui'
+import { Icon } from '../components/Icon'
 import { useLoad } from '../hooks/useLoad'
 import { useServerToday } from '../hooks/useServerToday'
 import { CURRENCIES, CURRENCY_NAMES, formatMoney, parseISODate } from '../i18n/format'
@@ -8,7 +9,20 @@ import { useAuth } from '../store/auth'
 import { useToast } from '../store/toast'
 
 type Line = Schemas['BudgetLineOut']
-const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+const MONTHS = [
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+]
 
 function zero(amount: string) {
   const n = Number(amount)
@@ -16,46 +30,71 @@ function zero(amount: string) {
 }
 
 function Fig({ amount, currency }: { amount: string; currency: string }) {
-  if (zero(amount)) return <span className="balance-empty">—</span>
-  return <span className="num">{formatMoney(amount, currency)}</span>
+  if (zero(amount)) return <span className="text-ink-soft">—</span>
+  return <span className="num whitespace-nowrap">{formatMoney(amount, currency)}</span>
 }
 
 function LineCol({ l }: { l: Line }) {
   return (
-    <section className="sheet min-w-0 p-4" aria-label={`Бюджет, ${CURRENCY_NAMES[l.currency]}`}>
-      <p className="balance-kicker">{l.currency}</p>
-      <p className="mt-3 text-xs font-sans font-semibold uppercase tracking-[0.14em] text-ink-soft">к оплате</p>
-      <p className={`balance-num break-all ${zero(l.unpaid) ? 'balance-empty' : ''}`}>{zero(l.unpaid) ? '—' : formatMoney(l.unpaid, l.currency)}</p>
-      <dl className="mt-3 text-sm">
-        <div className="flex justify-between gap-3 py-0.5">
+    <Card className="min-w-0 p-5" aria-label={`Бюджет, ${CURRENCY_NAMES[l.currency]}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="num font-medium">{l.currency}</p>
+        {l.is_over && <Badge tone="overdue">Превышен</Badge>}
+      </div>
+      <p className="mt-5 text-sm text-ink-soft">К оплате</p>
+      <p
+        className={`mt-1 whitespace-nowrap font-display text-[clamp(1.5rem,2.2vw,2rem)] font-semibold tracking-tight ${zero(l.unpaid) ? 'text-ink-soft' : ''}`}
+      >
+        {zero(l.unpaid) ? '—' : formatMoney(l.unpaid, l.currency)}
+      </p>
+      <dl className="mt-5 space-y-3 text-sm">
+        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
           <dt className="text-ink-soft">Бюджет</dt>
-          <dd>{l.budget === null ? <span className="balance-empty">—</span> : <Fig amount={l.budget} currency={l.currency} />}</dd>
-        </div>
-        <div className="sum-line mt-1 flex justify-between gap-3 py-0.5">
-          <dt className="text-ink-soft">Запланировано</dt>
-          <dd>
-            <Fig amount={l.scheduled} currency={l.currency} /> <span className="num text-ink-soft">{l.count}</span>
-            {l.usage_percent !== null && <span className="num text-ink-soft"> · {l.usage_percent}%</span>}
+          <dd className="whitespace-nowrap">
+            {l.budget === null ? (
+              <span className="text-ink-soft">—</span>
+            ) : (
+              <Fig amount={l.budget} currency={l.currency} />
+            )}
           </dd>
         </div>
-        <div className="flex justify-between gap-3 py-0.5">
+        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 border-t border-rule pt-3">
+          <dt className="text-ink-soft">Запланировано</dt>
+          <dd className="whitespace-nowrap">
+            <Fig amount={l.scheduled} currency={l.currency} />
+          </dd>
+        </div>
+        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
           <dt className="text-ink-soft">Оплачено</dt>
-          <dd><Fig amount={l.paid} currency={l.currency} /></dd>
+          <dd className="whitespace-nowrap text-paid">
+            <Fig amount={l.paid} currency={l.currency} />
+          </dd>
         </div>
         {l.remaining !== null && (
-          <div className="flex justify-between gap-3 py-0.5">
+          <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
             <dt className="text-ink-soft">Остаток бюджета</dt>
-            <dd><Fig amount={l.remaining} currency={l.currency} /></dd>
+            <dd className="whitespace-nowrap">
+              <Fig amount={l.remaining} currency={l.currency} />
+            </dd>
           </div>
         )}
         {l.is_over && (
-          <div className="flex justify-between gap-3 py-0.5">
-            <dt className="font-semibold">Превышение</dt>
-            <dd className="num font-semibold">{formatMoney(l.overrun, l.currency)}</dd>
+          <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-overdue">
+            <dt>Превышение</dt>
+            <dd className="num whitespace-nowrap font-medium">{formatMoney(l.overrun, l.currency)}</dd>
           </div>
         )}
       </dl>
-    </section>
+      <p className="mt-5 border-t border-rule pt-3 text-xs text-ink-soft">
+        <span className="num">{l.count}</span> платежей
+        {l.usage_percent !== null && (
+          <>
+            {' '}
+            · <span className="num">{l.usage_percent}%</span> бюджета запланировано
+          </>
+        )}
+      </p>
+    </Card>
   )
 }
 
@@ -97,7 +136,13 @@ export function BudgetPage() {
         if (!raw || raw === current) continue
         unwrap(
           await api.PUT('/api/v1/budgets', {
-            body: { period_type: type, year, month: type === 'month' ? month : null, currency: cur, planned_amount: raw },
+            body: {
+              period_type: type,
+              year,
+              month: type === 'month' ? month : null,
+              currency: cur,
+              planned_amount: raw,
+            },
           }),
         )
       }
@@ -118,70 +163,78 @@ export function BudgetPage() {
   }
 
   return (
-    <div className="win-window min-w-0 max-w-full">
-      <div className="win-titlebar">Бюджет</div>
-      <div className="min-w-0 bg-paper-2 px-2 pt-2 pb-3 text-ink">
-      <PageTitle
-        hideTitleOnDesk
-        aside={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex shrink-0 gap-2" role="radiogroup" aria-label="Период">
-              {(['month', 'year'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  role="radio"
-                  aria-checked={type === t}
-                  className={`btn h-11 min-h-11 w-28 shrink-0 rounded-sm px-3 leading-none ${type === t ? 'btn-primary' : ''}`}
-                  onClick={() => setType(t)}
-                >
-                  {t === 'month' ? 'Месяц' : 'Год'}
-                </button>
-              ))}
-            </div>
-            <div className="inline-flex items-center gap-2">
-              <button type="button" className="btn h-11 min-h-11 w-11 shrink-0 px-0 text-2xl leading-none" onClick={() => shift(-1)} aria-label="Назад">
-                ‹
-              </button>
-              <span className="min-w-[7.5rem] whitespace-nowrap text-center font-sans text-lg font-semibold">{type === 'month' ? `${MONTHS[month - 1]} ${year}` : year}</span>
-              <button type="button" className="btn h-11 min-h-11 w-11 shrink-0 px-0 text-2xl leading-none" onClick={() => shift(1)} aria-label="Вперёд">
-                ›
-              </button>
-            </div>
-          </div>
-        }
-      >
-        Бюджет
-      </PageTitle>
+    <>
+      <PageTitle>Бюджет</PageTitle>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          items={[
+            { value: 'month', label: 'Месяц' },
+            { value: 'year', label: 'Год' },
+          ]}
+          value={type}
+          onChange={(value) => setType(value as 'month' | 'year')}
+        />
+        <div className="flex min-w-0 items-center gap-1">
+          <Button variant="ghost" onClick={() => shift(-1)} aria-label="Предыдущий период">
+            <Icon name="chevron-left" />
+          </Button>
+          <span className="min-w-[8.5rem] whitespace-nowrap text-center text-sm font-semibold min-[390px]:text-base">
+            {type === 'month' ? `${MONTHS[month - 1]} ${year}` : year}
+          </span>
+          <Button variant="ghost" onClick={() => shift(1)} aria-label="Следующий период">
+            <Icon name="chevron-right" />
+          </Button>
+        </div>
+      </div>
       {report.error ? (
         <ErrorNote text={report.error} onRetry={report.reload} />
       ) : !report.data ? (
         <Loading />
       ) : (
         <>
-          <div className={`grid grid-cols-1 gap-3 desk:grid-cols-3 ${report.loading ? 'opacity-60' : ''}`}>
-            {report.data.lines.map((l) => <LineCol key={l.currency} l={l} />)}
+          <div
+            className={`grid grid-cols-1 items-start gap-4 min-[650px]:grid-cols-2 min-[1280px]:grid-cols-3 ${report.loading ? 'opacity-60' : ''}`}
+          >
+            {report.data.lines.map((l) => (
+              <LineCol key={l.currency} l={l} />
+            ))}
           </div>
-          <p className="text-xs text-ink-soft mt-2">
-            Запланировано — сумма периодов со сроком в этом {type === 'month' ? 'месяце' : 'году'}. Валюты не конвертируются.
+          <p className="mt-3 text-xs leading-relaxed text-ink-soft">
+            Запланировано — сумма периодов со сроком в этом {type === 'month' ? 'месяце' : 'году'}. Валюты считаются
+            отдельно.
           </p>
           {isAdmin && (
-            <form onSubmit={save} className="sheet p-4 mt-6 min-w-0">
-              <h2 className="font-sans text-lg font-semibold mb-3">Плановые суммы</h2>
-              <div className="grid grid-cols-1 desk:grid-cols-3 gap-3">
-                {CURRENCIES.map((c) => (
-                  <div key={c}>
-                    <label className="label" htmlFor={`b-${c}`}>{c}</label>
-                    <input id={`b-${c}`} className="field num" inputMode="decimal" placeholder="не задан" value={amounts[c] ?? ''} onChange={(e) => setAmounts({ ...amounts, [c]: e.target.value })} />
-                  </div>
-                ))}
-              </div>
-              <button className="btn btn-primary mt-4" disabled={busy}>Сохранить</button>
-            </form>
+            <Card className="mt-8 p-5">
+              <form onSubmit={save}>
+                <h2 className="font-display text-xl font-semibold">Плановые суммы</h2>
+                <p className="mt-1 mb-5 text-sm text-ink-soft">
+                  Задайте бюджет для выбранного {type === 'month' ? 'месяца' : 'года'} по каждой валюте.
+                </p>
+                <div className="grid grid-cols-1 gap-4 min-[650px]:grid-cols-3">
+                  {CURRENCIES.map((c) => (
+                    <div key={c}>
+                      <label className="label" htmlFor={`b-${c}`}>
+                        {c}
+                      </label>
+                      <Input
+                        id={`b-${c}`}
+                        className="num"
+                        inputMode="decimal"
+                        placeholder="Не задан"
+                        value={amounts[c] ?? ''}
+                        onChange={(e) => setAmounts({ ...amounts, [c]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button type="submit" variant="primary" className="mt-5" loading={busy}>
+                  Сохранить бюджет
+                </Button>
+              </form>
+            </Card>
           )}
         </>
       )}
-      </div>
-    </div>
+    </>
   )
 }
