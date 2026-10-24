@@ -18,6 +18,7 @@ from app.container import Container, build_container
 from app.infrastructure.logging import setup_logging
 from app.models import WorkerHeartbeat
 from app.infrastructure.channels.telegram import TelegramClient
+from app.services.bot_answers import BOT_COMMANDS
 from app.services.scheduler import run_checks
 from app.services.telegram_updates import TelegramUpdateHandler
 
@@ -67,7 +68,15 @@ class Worker:
         if not (s.telegram_enabled and s.telegram_polling_enabled):
             return None
         client = TelegramClient(s.telegram_bot_token or "", s.telegram_api_base)
-        return asyncio.create_task(TelegramUpdateHandler(self.c, client).poll_forever(self.stop_event))
+
+        async def run() -> None:
+            try:
+                await client.set_my_commands(BOT_COMMANDS)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("setMyCommands: %s", exc)
+            await TelegramUpdateHandler(self.c, client).poll_forever(self.stop_event)
+
+        return asyncio.create_task(run())
 
     async def run(self) -> None:
         interval = self.c.settings.worker_interval_seconds

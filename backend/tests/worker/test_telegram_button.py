@@ -9,8 +9,12 @@ from tests.integration.helpers import create_payment, occurrences_of
 
 class FakeTelegramClient:
     def __init__(self, updates=None):
-        self.answers, self.edits = [], []
+        self.answers, self.edits, self.messages = [], [], []
         self._updates = list(updates or [])
+
+    async def send_message(self, chat_id, text, reply_markup=None, reply_to=None):
+        self.messages.append({"chat_id": chat_id, "text": text, "reply_markup": reply_markup, "reply_to": reply_to})
+        return {"message_id": len(self.messages), "chat": {"id": chat_id}}
 
     async def answer_callback_query(self, callback_query_id, text, show_alert=False):
         self.answers.append((callback_query_id, text, show_alert))

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../store/auth'
+import { TelegramDialog } from './TelegramDialog'
 import { applyTheme, loadTheme, type Theme } from '../theme/theme'
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -10,6 +11,7 @@ export function Layout() {
   const { me, logout, isAdmin } = useAuth()
   const [theme, setTheme] = useState<Theme>(loadTheme())
   const [menu, setMenu] = useState(false)
+  const [tg, setTg] = useState(false)
   const toggleTheme = () => {
     const t = theme === 'light' ? 'dark' : 'light'
     setTheme(t)
@@ -50,6 +52,9 @@ export function Layout() {
               {me?.login}
               {isAdmin && <span className="ml-1 num text-xs uppercase">[admin]</span>}
             </span>
+            <button className="btn btn-sm" onClick={() => setTg(true)}>
+              Telegram
+            </button>
             <button className="btn btn-sm btn-ghost" onClick={toggleTheme} aria-label="Переключить тему">
               {theme === 'light' ? 'Тёмная' : 'Светлая'}
             </button>
@@ -62,6 +67,7 @@ export function Layout() {
           </div>
         </div>
       </header>
+      <TelegramDialog open={tg} onClose={() => setTg(false)} />
       <main id="main" className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

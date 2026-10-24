@@ -458,6 +458,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Состояние Telegram-бота и привязок */
+        get: operations["telegram_status_api_v1_telegram_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ссылка для привязки своего Telegram (одноразовая, 15 минут)
+         * @description Откройте `url` (t.me/<бот>?start=<код>) и нажмите Start — telegram id запишется в профиль.
+         */
+        post: operations["link_me_api_v1_telegram_link_post"];
+        /** Отвязать свой Telegram */
+        delete: operations["unlink_me_api_v1_telegram_link_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/chat-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Код подключения чата для напоминаний (admin)
+         * @description Добавьте бота в группу и отправьте там `/bind <код>` — напоминания пойдут в эту группу.
+         */
+        post: operations["chat_link_api_v1_telegram_chat_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -740,6 +798,20 @@ export interface components {
             /** Fake Today */
             fake_today: boolean;
         };
+        /** LinkCode */
+        LinkCode: {
+            /** Code */
+            code: string;
+            /** Command */
+            command: string;
+            /** Url */
+            url: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -989,6 +1061,23 @@ export interface components {
             as_of: string;
             /** Currencies */
             currencies: components["schemas"]["CurrencySummaryOut"][];
+        };
+        /** TelegramStatus */
+        TelegramStatus: {
+            /** Enabled */
+            enabled: boolean;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Bot Username */
+            bot_username: string | null;
+            /** Chat Bound */
+            chat_bound: boolean;
+            /** Chat Title */
+            chat_title: string | null;
+            /** Chat Source */
+            chat_source: string;
+            /** Me Linked */
+            me_linked: boolean;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -2851,6 +2940,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    telegram_status_api_v1_telegram_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramStatus"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    link_me_api_v1_telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkCode"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unlink_me_api_v1_telegram_link_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    chat_link_api_v1_telegram_chat_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkCode"];
                 };
             };
             /** @description Не авторизован */

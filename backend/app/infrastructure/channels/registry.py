@@ -21,17 +21,19 @@ def build_channels(
     user_emails: Callable[[], list[str]] | None = None,
     webhook_endpoints: Callable[[], list[EndpointConfig]] | None = None,
     now_iso: Callable[[], str] | None = None,
+    telegram_chat: Callable[[], str | None] | None = None,
 ) -> ChannelRegistry:
+    """telegram_chat — чат для напоминаний: привязанный командой /bind или TELEGRAM_CHAT_ID."""
     registry = ChannelRegistry()
-    if settings.telegram_enabled and settings.telegram_chat_id:
+    chat = telegram_chat or (lambda: settings.telegram_chat_id)
+    if settings.telegram_enabled:
         client = TelegramClient(settings.telegram_bot_token or "", settings.telegram_api_base)
-        registry.register(TelegramChannel(client, settings.telegram_chat_id))
+        registry.register(TelegramChannel(client, chat))
+        if not chat():
+            log.warning("Чат для напоминаний не задан: привяжите группу командой /bind или задайте TELEGRAM_CHAT_ID")
     else:
-        if settings.telegram_enabled:
-            log.warning("TELEGRAM_CHAT_ID не задан — Telegram работает в режиме «лог вместо отправки»")
-        else:
-            log.warning("TELEGRAM_BOT_TOKEN не задан — режим «лог вместо отправки»")
-        registry.register(LogTelegramChannel(settings.telegram_chat_id))
+        log.warning("TELEGRAM_BOT_TOKEN не задан — режим «лог вместо отправки»")
+        registry.register(LogTelegramChannel(chat))
     if settings.smtp_host:
         registry.register(EmailChannel(settings, user_emails))
         log.info("Email-канал включён: %s:%s", settings.smtp_host, settings.smtp_port)

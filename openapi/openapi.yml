@@ -1582,6 +1582,93 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/telegram/status:
+    get:
+      tags:
+      - telegram
+      summary: Состояние Telegram-бота и привязок
+      operationId: telegram_status_api_v1_telegram_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramStatus'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/telegram/link:
+    post:
+      tags:
+      - telegram
+      summary: Ссылка для привязки своего Telegram (одноразовая, 15 минут)
+      description: Откройте `url` (t.me/<бот>?start=<код>) и нажмите Start — telegram id запишется в профиль.
+      operationId: link_me_api_v1_telegram_link_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkCode'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+    delete:
+      tags:
+      - telegram
+      summary: Отвязать свой Telegram
+      operationId: unlink_me_api_v1_telegram_link_delete
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/telegram/chat-link:
+    post:
+      tags:
+      - telegram
+      summary: Код подключения чата для напоминаний (admin)
+      description: Добавьте бота в группу и отправьте там `/bind <код>` — напоминания пойдут в эту группу.
+      operationId: chat_link_api_v1_telegram_chat_link_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkCode'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - OAuth2PasswordBearer: []
 components:
   schemas:
     AuditLogOut:
@@ -2073,6 +2160,30 @@ components:
       - timezone
       - fake_today
       title: HealthResponse
+    LinkCode:
+      properties:
+        code:
+          type: string
+          title: Code
+        command:
+          type: string
+          title: Command
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - code
+      - command
+      - url
+      - expires_at
+      title: LinkCode
     LoginRequest:
       properties:
         login:
@@ -2475,6 +2586,43 @@ components:
       - as_of
       - currencies
       title: SummaryOut
+    TelegramStatus:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        dry_run:
+          type: boolean
+          title: Dry Run
+        bot_username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Bot Username
+        chat_bound:
+          type: boolean
+          title: Chat Bound
+        chat_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chat Title
+        chat_source:
+          type: string
+          title: Chat Source
+        me_linked:
+          type: boolean
+          title: Me Linked
+      type: object
+      required:
+      - enabled
+      - dry_run
+      - bot_username
+      - chat_bound
+      - chat_title
+      - chat_source
+      - me_linked
+      title: TelegramStatus
     TokenResponse:
       properties:
         access_token:

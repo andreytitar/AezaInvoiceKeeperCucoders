@@ -292,3 +292,16 @@ class WebhookEndpoint(TimestampMixin, Base):
     secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     events: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+
+
+class TelegramLinkCode(Base):
+    """Одноразовый код привязки: пользователя (deep link /start) или чата для напоминаний (/bind)."""
+
+    __tablename__ = "telegram_link_codes"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    purpose: Mapped[str] = mapped_column(String(16))  # user | chat
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

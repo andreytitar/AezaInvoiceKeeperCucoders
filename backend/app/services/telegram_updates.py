@@ -20,11 +20,14 @@ from app.infrastructure.channels.telegram import TelegramClient, TelegramError
 from app.infrastructure.request_context import RequestContext, request_context
 from app.models import TelegramUpdatesOffset
 from app.repositories.users import UserRepository
+from app.services.bot_answers import HELP, BotAnswers, command_for_text
 from app.services.occurrences import OccurrenceService
+from app.services.telegram_link import TelegramLinkService, get_bound_chat
 
 log = logging.getLogger("app.telegram.updates")
 
-CALLBACK_PAID = "paid:"
+CALLBACK_PAID = "paid:"  # под напоминанием: сообщение редактируется
+CALLBACK_LIST_PAID = "lp:"  # под ответом на /topay и т. п.: отдельное сообщение
 
 
 def paid_callback(occurrence_id: uuid.UUID) -> str:
@@ -50,15 +53,20 @@ class TelegramUpdateHandler:
 
     # --- обработка ---
     async def handle_update(self, update: dict) -> None:
+        if update.get("message"):
+            await self.handle_message(update["message"])
+            return
         cq = update.get("callback_query")
         if not cq:
             return
         data = cq.get("data") or ""
-        if not data.startswith(CALLBACK_PAID):
+        from_list = data.startswith(CALLBACK_LIST_PAID)
+        prefix = CALLBACK_LIST_PAID if from_list else CALLBACK_PAID
+        if not data.startswith(prefix):
             await self._answer(cq, "Неизвестная команда", alert=True)
             return
         try:
-            occurrence_id = uuid.UUID(data[len(CALLBACK_PAID):])
+            occurrence_id = uuid.UUID(data[len(prefix):])
         except ValueError:
             await self._answer(cq, "Некорректная кнопка", alert=True)
             return
@@ -72,7 +80,7 @@ class TelegramUpdateHandler:
                 await self._answer(
                     cq,
                     f"Ваш Telegram (id {tg_id}) не привязан к пользователю Invoice Keeper. "
-                    "Попросите администратора указать этот id в вашем профиле.",
+                    "Откройте панель → «Привязать Telegram» или попросите администратора.",
                     alert=True,
                 )
                 return
@@ -104,12 +112,119 @@ class TelegramUpdateHandler:
             )
         await self._answer(cq, "Уже было отмечено как оплачено" if already_paid else "Отмечено как оплачено")
         msg = cq.get("message") or {}
+        if from_list:
+            # кнопка под списком: список не трогаем, отвечаем отдельным сообщением
+            if not already_paid and (msg.get("chat") or {}).get("id") is not None:
+                await self._send(msg["chat"]["id"], text, reply_to=msg.get("message_id"))
+            return
         if msg.get("message_id") and (msg.get("chat") or {}).get("id") is not None:
             try:
                 await self.client.edit_message_text(msg["chat"]["id"], msg["message_id"], text)
             except TelegramError as exc:
                 # «message is not modified» при повторном нажатии — нормально
                 log.info("Сообщение не отредактировано: %s", exc)
+
+    # --- сообщения и команды ---
+    async def _send(self, chat_id, text: str, reply_markup: dict | None = None, reply_to: int | None = None) -> None:
+        try:
+            await self.client.send_message(chat_id, text, reply_markup, reply_to=reply_to)
+        except TelegramError as exc:
+            log.warning("sendMessage: %s", exc)
+
+    def _access(self, db, chat_id: int, tg_id: int | None):
+        """Кто спрашивает: привязанный пользователь (в любом чате) или участник чата напоминаний."""
+        user = UserRepository(db).get_by_telegram_id(int(tg_id)) if tg_id else None
+        bound = get_bound_chat(db, self.c.settings).chat_id
+        in_bound_chat = bound is not None and str(chat_id) == str(bound)
+        return user, (user is not None or in_bound_chat)
+
+    async def handle_message(self, msg: dict) -> None:
+        chat = msg.get("chat") or {}
+        chat_id = chat.get("id")
+        tg_id = (msg.get("from") or {}).get("id")
+        if chat_id is None:
+            return
+        private = chat.get("type") == "private"
+        text = (msg.get("text") or msg.get("caption") or "").strip()
+
+        if msg.get("photo") or msg.get("document"):
+            handler = self.c.extras.get("telegram_receipt_handler")
+            if handler and private:
+                await handler(self, msg)
+            return
+
+        if text.startswith("/"):
+            head, _, args = text.partition(" ")
+            cmd = head[1:].split("@", 1)[0].lower()
+            args = args.strip()
+        elif private and text:
+            cmd, args = command_for_text(text), ""
+            if cmd is None:
+                await self._send(chat_id, "Не понял вопрос. " + HELP)
+                return
+        else:
+            return
+
+        if cmd == "start":
+            await self._cmd_start(chat_id, tg_id, args, private)
+        elif cmd == "bind":
+            await self._cmd_bind(chat_id, chat.get("title"), args, msg.get("message_id"))
+        elif cmd == "help":
+            await self._send(chat_id, HELP)
+        elif cmd in ("topay", "overdue", "week", "paid", "summary", "add"):
+            with self.c.session_factory() as db:
+                user, allowed = self._access(db, chat_id, tg_id)
+                if not allowed:
+                    await self._send(
+                        chat_id,
+                        "Нет доступа. Привяжите Telegram в панели Invoice Keeper (кнопка «Привязать Telegram») "
+                        "или спросите в чате, куда приходят напоминания.",
+                    )
+                    return
+                if cmd == "add":
+                    adder = self.c.extras.get("telegram_add_handler")
+                    if adder:
+                        await adder(self, db, user, chat_id, args, msg.get("message_id"))
+                    return
+                answer = getattr(BotAnswers(db, self.c.clock), cmd)()
+            await self._send(chat_id, answer.text, answer.reply_markup())
+
+    async def _cmd_start(self, chat_id, tg_id, code: str, private: bool) -> None:
+        if not code:
+            await self._send(chat_id, HELP)
+            return
+        if not private or not tg_id:
+            await self._send(chat_id, "Привязка аккаунта работает только в личке с ботом.")
+            return
+        with self.c.session_factory() as db:
+            try:
+                user = TelegramLinkService(db, self.c.clock, self.c.settings).link_user(code, int(tg_id))
+            except DomainError as exc:
+                await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}")
+                return
+            login = user.login
+        await self._send(
+            chat_id,
+            f"Готово: этот Telegram привязан к пользователю <b>{html.escape(login)}</b>.\n"
+            "Теперь вы можете нажимать «Оплачено» под напоминаниями и спрашивать бота: /topay, /overdue, /summary.",
+        )
+
+    async def _cmd_bind(self, chat_id, title: str | None, code: str, reply_to) -> None:
+        if not code:
+            await self._send(chat_id, "Получите код в панели: «Платежи» → «Подключить чат», затем отправьте /bind КОД.")
+            return
+        with self.c.session_factory() as db:
+            try:
+                TelegramLinkService(db, self.c.clock, self.c.settings).bind_chat(code, int(chat_id), title)
+            except DomainError as exc:
+                await self._send(chat_id, f"Не получилось: {html.escape(exc.message)}", reply_to=reply_to)
+                return
+        await self._send(
+            chat_id,
+            "Готово: напоминания о платежах будут приходить в этот чат.\n"
+            "Спросите: /topay — что оплатить, /overdue — что просрочено, /summary — итоги.",
+            reply_to=reply_to,
+        )
 
     async def _answer(self, cq: dict, text: str, alert: bool = False) -> None:
         try:

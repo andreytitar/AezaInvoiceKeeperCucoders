@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -49,8 +50,17 @@ class TelegramClient:
             raise TelegramError(f"{method}: {desc}", retryable=retryable)
         return data["result"]
 
-    async def send_message(self, chat_id: str, text: str, reply_markup: dict | None = None) -> dict:
-        payload: dict[str, Any] = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    async def send_message(
+        self, chat_id: str | int, text: str, reply_markup: dict | None = None, reply_to: int | None = None
+    ) -> dict:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "link_preview_options": {"is_disabled": True},
+        }
+        if reply_to:
+            payload["reply_parameters"] = {"message_id": reply_to, "allow_sending_without_reply": True}
         if reply_markup:
             payload["reply_markup"] = reply_markup
         return await self.call("sendMessage", payload)
@@ -65,8 +75,32 @@ class TelegramClient:
             "answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert}
         )
 
+    async def get_me(self) -> dict:
+        return await self.call("getMe", {})
+
+    async def set_my_commands(self, commands: list[tuple[str, str]]) -> Any:
+        return await self.call(
+            "setMyCommands", {"commands": [{"command": c, "description": d} for c, d in commands]}
+        )
+
+    async def get_file(self, file_id: str) -> dict:
+        return await self.call("getFile", {"file_id": file_id})
+
+    async def download_file(self, file_path: str, max_bytes: int) -> bytes:
+        url = self._base.replace("/bot", "/file/bot", 1) + "/" + file_path
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
+                resp = await client.get(url)
+        except httpx.HTTPError as exc:
+            raise TelegramError(f"download: {type(exc).__name__}") from None
+        if resp.status_code != 200:
+            raise TelegramError(f"download: HTTP {resp.status_code}")
+        if len(resp.content) > max_bytes:
+            raise TelegramError("download: файл слишком большой", retryable=False)
+        return resp.content
+
     async def get_updates(self, offset: int | None, timeout: int = 25) -> list[dict]:
-        payload: dict[str, Any] = {"timeout": timeout, "allowed_updates": json.dumps(["callback_query"])}
+        payload: dict[str, Any] = {"timeout": timeout, "allowed_updates": json.dumps(["callback_query", "message"])}
         if offset is not None:
             payload["offset"] = offset
         return await self.call("getUpdates", payload, timeout=timeout + 10)
@@ -78,15 +112,23 @@ def reply_markup_for(n: Notification) -> dict | None:
     return {"inline_keyboard": [[{"text": a.text, "callback_data": a.callback_data} for a in n.actions]]}
 
 
+ChatProvider = Callable[[], str | None]
+
+
 class TelegramChannel:
     name = "telegram"
 
-    def __init__(self, client: TelegramClient, chat_id: str) -> None:
+    def __init__(self, client: TelegramClient, chat: str | None | ChatProvider) -> None:
         self.client = client
-        self.chat_id = chat_id
+        self._chat = chat if callable(chat) else (lambda: chat)
+
+    @property
+    def chat_id(self) -> str | None:
+        return self._chat()
 
     def recipients(self) -> list[str]:
-        return [self.chat_id]
+        chat = self._chat()
+        return [chat] if chat else []
 
     async def send(self, message: Notification, recipient: str) -> SendResult:
         try:
@@ -101,11 +143,11 @@ class LogTelegramChannel:
 
     name = "telegram"
 
-    def __init__(self, chat_id: str | None) -> None:
-        self.chat_id = chat_id or "log"
+    def __init__(self, chat: str | None | ChatProvider) -> None:
+        self._chat = chat if callable(chat) else (lambda: chat)
 
     def recipients(self) -> list[str]:
-        return [self.chat_id]
+        return [self._chat() or "log"]
 
     async def send(self, message: Notification, recipient: str) -> SendResult:
         log.warning(
