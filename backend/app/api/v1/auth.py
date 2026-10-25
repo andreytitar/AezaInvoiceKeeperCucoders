@@ -27,6 +27,7 @@ from app.schemas.auth import (
     TelegramLoginConfig,
     TelegramLoginResponse,
     TelegramPendingOut,
+    TelegramWebAppAuth,
     TelegramWidgetAuth,
     TokenResponse,
 )
@@ -209,6 +210,35 @@ def telegram_deeplink_status(request: Request, response: Response, c: ContainerD
 def telegram_pending(request: Request, c: ContainerDep, db: DbDep) -> TelegramPendingOut:
     pending = TelegramWebAuth(db, c.clock, c.settings).has_pending(request.cookies.get(TELEGRAM_PENDING_COOKIE))
     return TelegramPendingOut(pending=pending)
+
+
+@router.post(
+    "/telegram/webapp",
+    response_model=TelegramLoginResponse,
+    summary="Вход из Telegram Mini App (initData)",
+    description=(
+        "Проверяет подпись initData (HMAC-SHA256 с ключом WebAppData). "
+        "Та же развилка, что у Login Widget: привязанный Telegram получает сессию, "
+        "непривязанный — статус unlinked и экран выбора на сайте."
+    ),
+    responses=responses(401, 422),
+)
+def telegram_webapp_login(
+    body: TelegramWebAppAuth, request: Request, response: Response, c: ContainerDep, db: DbDep
+) -> TelegramLoginResponse:
+    assert_browser_origin(request)
+    found = TelegramWebAuth(db, c.clock, c.settings, c.rate_limiter).identify_webapp(body.init_data)
+    if found.status == "authenticated" and found.login is not None:
+        _set_cookie(response, found.login.token, c)
+        _clear_pending(response)
+        return TelegramLoginResponse(
+            status="authenticated",
+            access_token=found.login.token,
+            user=MeOut.from_user(found.login.user),
+        )
+    if found.pending:
+        _set_pending(response, found.pending, c)
+    return TelegramLoginResponse(status="unlinked")
 
 
 @router.post(

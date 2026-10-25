@@ -246,7 +246,7 @@ export function RecurringPaymentsPage() {
               Оплаченные и прошедшие периоды сохранят прежнюю сумму. Срок и периодичность не меняются.
             </p>
           )}
-          <div>
+          <div className="min-w-0">
             <label className="label" htmlFor="p-title">
               Название
             </label>
@@ -260,7 +260,7 @@ export function RecurringPaymentsPage() {
             />
           </div>
           <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
-            <div>
+            <div className="min-w-0">
               <label className="label" htmlFor="p-amount">
                 Сумма
               </label>
@@ -276,7 +276,7 @@ export function RecurringPaymentsPage() {
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="label" htmlFor="p-cur">
                 Валюта
               </label>
@@ -287,7 +287,7 @@ export function RecurringPaymentsPage() {
               </Select>
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="label" htmlFor="p-date">
               Дата ближайшей оплаты
             </label>
@@ -303,7 +303,7 @@ export function RecurringPaymentsPage() {
               Следующие сроки считаются от этого числа; если его нет в месяце — последний день месяца.
             </p>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="label" htmlFor="p-rec">
               Периодичность
             </label>

@@ -23,6 +23,10 @@ class LoginResponse(TokenResponse):
     user: MeOut
 
 
+class TelegramWebAppAuth(InputModel):
+    init_data: str = Field(min_length=1, max_length=4096, description="Строка window.Telegram.WebApp.initData")
+
+
 class TelegramWidgetAuth(BaseModel):
     """Поля Telegram Login Widget. Лишние ключи сохраняются: они входят в подпись."""
 

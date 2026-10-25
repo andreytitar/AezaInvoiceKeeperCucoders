@@ -136,8 +136,11 @@
   dialog::backdrop {
     background: rgb(0 0 0 / 50%);
   }
+  dialog[open]::backdrop {
+    animation: backdrop-in 160ms ease-out;
+  }
   dialog[open] {
-    animation: dialog-in 160ms ease-out;
+    animation: dialog-in 180ms ease-out;
   }
 }
 @layer components {
@@ -250,6 +253,23 @@
   }
   .field[aria-invalid='true'] {
     border-color: var(--overdue);
+  }
+  select.field {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23626267' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 2.25rem;
+  }
+  [data-theme='dark'] select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  select.field.payments-sort {
+    width: auto;
+    max-width: 100%;
   }
   .date-input {
     min-width: 124px;
@@ -510,7 +530,73 @@
     color: var(--paid);
   }
   .fade-in {
-    animation: dialog-in 160ms ease-out;
+    animation: fade-up 160ms ease-out both;
+  }
+  .page-enter {
+    animation: fade-up 180ms ease-out both;
+  }
+  .reveal-up {
+    animation: fade-up 180ms ease-out both;
+  }
+  .stagger-cards > * {
+    animation: fade-up 180ms ease-out both;
+  }
+  .stagger-cards > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .stagger-cards > *:nth-child(2) {
+    animation-delay: 55ms;
+  }
+  .stagger-cards > *:nth-child(3) {
+    animation-delay: 110ms;
+  }
+  .stagger-cards > *:nth-child(4) {
+    animation-delay: 165ms;
+  }
+  .list-row-enter {
+    animation: fade-up 160ms ease-out both;
+  }
+  .list-enter {
+    animation: fade-up 180ms ease-out;
+  }
+  .toast-enter {
+    animation: toast-in 180ms ease-out both;
+  }
+  .toast-leave {
+    animation: toast-out 160ms ease-in both;
+  }
+  .panel-enter {
+    animation: panel-in 180ms ease-out both;
+  }
+  .cal-enter-right {
+    animation: cal-enter-right 200ms ease-out both;
+  }
+  .cal-enter-left {
+    animation: cal-enter-left 200ms ease-out both;
+  }
+  .row-paid-flash {
+    animation: paid-flash 360ms ease-out;
+  }
+  .login-reveal {
+    animation: fade-up 200ms ease-out both;
+  }
+  .login-reveal-1 {
+    animation-delay: 0ms;
+  }
+  .login-reveal-2 {
+    animation-delay: 70ms;
+  }
+  .login-reveal-3 {
+    animation-delay: 140ms;
+  }
+  .login-reveal-4 {
+    animation-delay: 210ms;
+  }
+  .login-reveal-5 {
+    animation-delay: 280ms;
+  }
+  .content-enter {
+    animation: fade-in 150ms ease-out both;
   }
   .desk-only {
     display: block;
@@ -536,23 +622,15 @@
   background: var(--paper-2);
   padding: 28px 16px 16px;
 }
-.shell-brand {
+.shell-brand-stack {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
+  min-width: 0;
 }
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--ink);
-  color: var(--paper-2);
-}
-.brand-mark .icon {
-  width: 20px;
-  height: 20px;
+.brand-product {
+  min-width: 0;
 }
 .brand-name {
   font-family: var(--font-display);
@@ -561,10 +639,71 @@
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
+.brand-name-header {
+  font-size: 20px;
+}
 .brand-caption {
   margin-top: 3px;
   color: var(--ink-soft);
   font-size: 11px;
+  line-height: 1.25;
+}
+.brand-lockup-intro .brand-product {
+  animation: fade-up 360ms ease-out 620ms both;
+}
+
+/* Aeza: раскрытие «é» → aeza (как aeza.net: margin-left + opacity/x) */
+.aeza-logo-row {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+.aeza-key-cell {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.aeza-key-cell + .aeza-key-cell {
+  padding-left: 2px;
+}
+.aeza-key-cell img {
+  display: block;
+  width: 36px;
+  height: 36px;
+}
+.aeza-key-hero {
+  z-index: 3;
+}
+.aeza-logo-intro .aeza-logo-row {
+  margin-left: 38px;
+  animation: aeza-row-expand 420ms ease-out 200ms forwards;
+}
+.aeza-logo-intro .aeza-key-a {
+  opacity: 0;
+  transform: translateX(5px);
+  animation: aeza-key-from-right 420ms ease-out 200ms forwards;
+}
+.aeza-logo-intro .aeza-key-hero {
+  transform: scale(1);
+  transform-origin: center center;
+  animation: aeza-key-e-pulse 420ms ease-out 200ms forwards;
+}
+.aeza-logo-intro .aeza-key-z {
+  opacity: 0;
+  transform: translateX(-5px);
+  animation: aeza-key-from-left 420ms ease-out 280ms forwards;
+}
+.aeza-logo-intro .aeza-key-a2 {
+  opacity: 0;
+  transform: translateX(-5px);
+  animation: aeza-key-from-left 420ms ease-out 400ms forwards;
+}
+.aeza-logo-sm .aeza-key-cell img {
+  width: 28px;
+  height: 28px;
+}
+.aeza-logo-sm.aeza-logo-intro .aeza-logo-row {
+  margin-left: 30px;
 }
 .shell-nav {
   display: flex;
@@ -781,6 +920,47 @@
   padding-inline: 0;
 }
 
+/* Calendar grid: payment preview in day cells */
+[data-cal-grid] .cal-cell-occ {
+  max-width: 100%;
+}
+[data-cal-grid] .cal-cell-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* «Итоги на дату» in the calendar sidebar (narrow column) */
+.cal-asof-summary {
+  min-width: 0;
+  overflow: hidden;
+}
+.cal-asof-summary .balance-num {
+  font-size: 1.125rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.cal-asof-summary .cal-asof-line {
+  font-size: 0.8125rem;
+}
+.cal-asof-summary .cal-asof-line dd {
+  overflow: hidden;
+}
+@media (min-width: 1200px) {
+  .cal-asof-summary .balance-num {
+    font-size: 1.25rem;
+  }
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .cal-asof-summary .cal-asof-line {
+    font-size: 0.75rem;
+  }
+  .cal-asof-summary .balance-num {
+    font-size: 1rem;
+  }
+}
+
 @media (max-width: 1279px) {
   .shell-rail {
     width: 216px;
@@ -939,7 +1119,25 @@
     opacity: 0.45;
   }
 }
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fade-up {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -947,6 +1145,98 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes cal-enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes cal-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes paid-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--paid) 22%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes aeza-row-expand {
+  to {
+    margin-left: 0;
+  }
+}
+@keyframes aeza-key-from-right {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes aeza-key-from-left {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes aeza-key-e-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.85);
   }
 }
 @keyframes spin {
@@ -962,10 +1252,20 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
+  .aeza-logo-intro .aeza-logo-row {
+    margin-left: 0 !important;
+  }
+  .aeza-logo-intro .aeza-key-a,
+  .aeza-logo-intro .aeza-key-z,
+  .aeza-logo-intro .aeza-key-a2 {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 @media (max-width: 719px) {
-  .mobile-menu-dialog {
+  .mobile-menu-dialog,
+  .calendar-feed-dialog {
     width: 100%;
     max-width: 100%;
     max-height: 90dvh;

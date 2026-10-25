@@ -71,7 +71,7 @@ class Worker:
 
         async def run() -> None:
             try:
-                await apply_telegram_profile(client)
+                await apply_telegram_profile(client, s)
             except Exception as exc:  # noqa: BLE001
                 log.warning("профиль бота: %s", exc)
             await TelegramUpdateHandler(self.c, client).poll_forever(self.stop_event)

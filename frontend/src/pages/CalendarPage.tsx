@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, unwrap, type Occurrence } from '../api/client'
 import { CalendarDayDetailPanel } from '../components/CalendarDayDetailPanel'
+import { CalendarFeedDialog } from '../components/CalendarFeedDialog'
 import { Icon } from '../components/Icon'
 import { MarkPaidDialog } from '../components/MarkPaidDialog'
 import { SummaryCards } from '../components/SummaryCards'
@@ -11,11 +12,6 @@ import { formatDate, formatMoney, formatMonth, parseISODate, toISODate } from '.
 import { useToast } from '../store/toast'
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
-
-/** Google accepts an https ICS URL in cid, rather than webcal or /calendar/r. */
-function googleSubscribeHref(icsUrl: string): string {
-  return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icsUrl)}`
-}
 
 function occurrenceTone(o: Occurrence): string {
   if (o.status === 'paid') return 'bg-paid'
@@ -46,6 +42,7 @@ function CalendarView({ today }: { today: string }) {
   const [asOf, setAsOf] = useState('')
   const [feed, setFeed] = useState<{ url: string; webcal_url: string } | null>(null)
   const [feedBusy, setFeedBusy] = useState(false)
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right')
 
   const openFeed = async (rotate = false) => {
     setFeedBusy(true)
@@ -87,6 +84,7 @@ function CalendarView({ today }: { today: string }) {
   const activeOccurrence = pickOccurrence(selectedDayData, selected)
 
   const shift = (n: number) => {
+    setSlideDir(n > 0 ? 'right' : 'left')
     const next = new Date(month.getFullYear(), month.getMonth() + n, 1)
     setMonth(next)
     const t = parseISODate(today)
@@ -96,6 +94,7 @@ function CalendarView({ today }: { today: string }) {
 
   const goToday = () => {
     const t = parseISODate(today)
+    setSlideDir(t.getMonth() >= month.getMonth() && t.getFullYear() >= month.getFullYear() ? 'right' : 'left')
     setMonth(new Date(t.getFullYear(), t.getMonth(), 1))
     setSelectedDay(today)
     setSelected(null)
@@ -173,7 +172,12 @@ function CalendarView({ today }: { today: string }) {
           ) : !cal.data ? (
             <Skeleton className="h-[440px] w-full" />
           ) : (
-            <Card className={`overflow-hidden !p-0 ${cal.loading ? 'opacity-60' : ''}`} data-cal-grid aria-busy={cal.loading}>
+            <Card
+              key={`${month.getFullYear()}-${month.getMonth()}`}
+              className={`overflow-hidden !p-0 ${cal.loading ? 'opacity-60' : ''} ${slideDir === 'right' ? 'cal-enter-right' : 'cal-enter-left'}`}
+              data-cal-grid
+              aria-busy={cal.loading}
+            >
               <div className="grid grid-cols-7 border-b border-rule bg-paper px-1">
                 {WEEKDAYS.map((w) => (
                   <div key={w} className="py-3 text-center text-xs font-medium text-ink-soft">{w}</div>
@@ -216,7 +220,7 @@ function CalendarView({ today }: { today: string }) {
                               <button
                                 key={o.id}
                                 type="button"
-                                className="block w-full min-w-0 rounded-md bg-paper px-1.5 py-1 text-left text-[10px] leading-tight transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-accent"
+                                className="cal-cell-occ block w-full min-w-0 overflow-hidden rounded-md bg-paper px-1.5 py-1 text-left text-[10px] leading-tight transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-accent"
                                 onClick={() => selectDay(iso, o)}
                                 title={`${o.title} · ${formatMoney(o.amount, o.currency)}`}
                               >
@@ -224,7 +228,12 @@ function CalendarView({ today }: { today: string }) {
                                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${occurrenceTone(o)}`} />
                                   <span className="min-w-0 truncate">{o.title}</span>
                                 </span>
-                                <span className="num mt-0.5 block whitespace-nowrap text-[9px] min-[1440px]:text-[10px]">{formatMoney(o.amount, o.currency)}</span>
+                                <span
+                                  className="cal-cell-amount num mt-0.5 block min-w-0 max-w-full truncate text-[9px] min-[1440px]:text-[10px]"
+                                  title={formatMoney(o.amount, o.currency)}
+                                >
+                                  {formatMoney(o.amount, o.currency)}
+                                </span>
                               </button>
                             ))}
                             {occurrences.length > 2 && <span className="pointer-events-none block px-1.5 text-[10px] text-ink-soft">+{occurrences.length - 2}</span>}
@@ -270,27 +279,13 @@ function CalendarView({ today }: { today: string }) {
         </aside>
       </div>
 
-      {feed && (
-        <Card className="mt-4 min-w-0 p-4" aria-label="Подписка на календарь">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold">Календарь в телефоне</h2>
-              <p className="mt-1 max-w-3xl text-sm text-ink-soft">
-                Все сроки появятся в Google или Apple Календаре с напоминанием за 3 дня и в день оплаты. Календарь обновляется автоматически. Ссылка личная — не пересылайте её.
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" className="w-10 shrink-0 !px-0" onClick={() => setFeed(null)} aria-label="Закрыть подписку на календарь"><Icon name="close" /></Button>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <a className="btn btn-primary" href={feed.webcal_url}>Apple Календарь</a>
-            <a className="btn" href={googleSubscribeHref(feed.url)} target="_blank" rel="noopener noreferrer">Google Календарь</a>
-            <Button variant="secondary" onClick={copyFeed}><Icon name="link" />Скопировать ссылку</Button>
-            <Button variant="ghost" onClick={() => openFeed(true)} loading={feedBusy}>Сменить ссылку</Button>
-          </div>
-          <p className="mt-3 text-xs text-ink-soft">После смены ссылки прежняя подписка перестанет работать.</p>
-          <code className="num mt-2 block whitespace-normal break-all text-xs text-ink-soft">{feed.url}</code>
-        </Card>
-      )}
+      <CalendarFeedDialog
+        feed={feed}
+        busy={feedBusy}
+        onClose={() => setFeed(null)}
+        onCopy={copyFeed}
+        onRotate={() => openFeed(true)}
+      />
 
       <MarkPaidDialog occurrence={paying} today={today} busy={busy} onClose={() => setPaying(null)} onSubmit={(d) => paying && patch(paying, { status: 'paid', paid_date: d })} />
     </>

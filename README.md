@@ -143,6 +143,24 @@ docker compose up --build
 логин и пароль работают как раньше. Домен BotFather и HTTPS для этой кнопки не нужны.
 За HTTPS поставьте `COOKIE_SECURE=true`.
 
+### Telegram Mini App (полная панель в боте)
+
+Mini App открывает **тот же React-сайт**, что и браузер: дашборд, календарь, все маршруты.
+Telegram требует **HTTPS** для Web App URL.
+
+1. Выставьте публичный адрес: `PUBLIC_BASE_URL=https://ваш-домен` (и `COOKIE_SECURE=true`).
+   При необходимости отдельный URL — `TELEGRAM_MINI_APP_URL=https://ваш-домен/` (иначе берётся `PUBLIC_BASE_URL`).
+2. Перезапустите **worker**: при старте он вызывает `setChatMenuButton` и ставит кнопку меню
+   **«Открыть панель»** на этот адрес (если URL начинается с `https://`).
+3. В [@BotFather](https://t.me/BotFather) для бота можно дополнительно указать домен Mini App
+   (**Bot Settings → Configure Mini App / Domain**), совпадающий с хостом из шага 1.
+4. Пользователь открывает бота → кнопка меню слева от поля ввода (или команда `/site`) →
+   загружается панель. Если Telegram уже привязан к аккаунту, **вход по `initData` автоматический**;
+   иначе — тот же экран выбора, что после Login Widget (временная команда, код, привязка логина).
+
+Локально без HTTPS кнопка Mini App не настраивается (в лог worker пишет подсказку); magic-ссылки и
+вход через `t.me?start=weblogin_…` работают как раньше.
+
 ### Бот отвечает на вопросы
 
 | Команда | Ответ |
@@ -623,6 +641,7 @@ worker_heartbeat, app_meta
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | пусто | бот и чат; без токена — лог вместо отправки |
 | `TELEGRAM_BOT_USERNAME` | пусто | имя бота для кнопки входа; пусто при заданном токене — сервер берёт его через getMe |
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | одноразовые ссылки из бота |
+| `TELEGRAM_MINI_APP_URL` | _(пусто → `PUBLIC_BASE_URL`)_ | HTTPS-адрес Mini App; worker ставит кнопку меню |
 | `REMINDER_DAYS_BEFORE` | `3` | за сколько дней напоминать (не меньше 3) |
 | `WORKER_INTERVAL_SECONDS` | `60` | период фоновой проверки |
 | `COOKIE_SECURE` | `false` | `true` за HTTPS |

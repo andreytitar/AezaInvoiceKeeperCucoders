@@ -92,6 +92,14 @@ class TelegramClient:
     async def set_my_short_description(self, short_description: str) -> Any:
         return await self.call("setMyShortDescription", {"short_description": short_description})
 
+    async def set_chat_menu_button(self, text: str, web_app_url: str, chat_id: int | None = None) -> Any:
+        payload: dict[str, Any] = {
+            "menu_button": {"type": "web_app", "text": text, "web_app": {"url": web_app_url}},
+        }
+        if chat_id is not None:
+            payload["chat_id"] = chat_id
+        return await self.call("setChatMenuButton", payload)
+
     async def get_file(self, file_id: str) -> dict:
         return await self.call("getFile", {"file_id": file_id})
 

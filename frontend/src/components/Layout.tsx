@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+import { PageEnter } from './PageEnter'
 import { useAuth } from '../store/auth'
 import { useToast } from '../store/toast'
 import { applyTheme, loadTheme, type Theme } from '../theme/theme'
 import { Footer } from './Footer'
 import { MobileNav, type ShellLink } from './MobileNav'
 import { TelegramDialog } from './TelegramDialog'
+import { BrandLockup } from './BrandLockup'
 import { Icon } from './Icon'
 import { Button, Menu, MenuItem } from './ui'
 
@@ -22,14 +24,8 @@ const adminSections: ShellLink[] = [
 ]
 export function Wordmark() {
   return (
-    <NavLink to="/" className="shell-brand" aria-label="Invoice Keeper — платежи">
-      <span className="brand-mark">
-        <Icon name="receipt" />
-      </span>
-      <div>
-        <p className="brand-name">Invoice Keeper</p>
-        <p className="brand-caption">Регулярные платежи команды</p>
-      </div>
+    <NavLink to="/" className="block min-w-0" aria-label="Invoice Keeper — платежи">
+      <BrandLockup />
     </NavLink>
   )
 }
@@ -134,7 +130,7 @@ export function Layout() {
               )}
             </div>
           )}
-          <Outlet />
+          <PageEnter />
         </main>
         <Footer />
       </div>

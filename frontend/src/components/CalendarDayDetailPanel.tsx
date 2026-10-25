@@ -35,7 +35,7 @@ export function CalendarDayDetailPanel({
   const occ = selectedOccurrence
 
   return (
-    <div className="min-w-0 p-4" aria-label="Платежи выбранного дня">
+    <div key={selectedDay ?? 'none'} className="panel-enter min-w-0 p-4" aria-label="Платежи выбранного дня">
       <div className="mb-4 flex items-center justify-between gap-3 border-b border-rule pb-3">
         <h2 className="text-base font-semibold">{selectedDay ? formatDate(selectedDay) : 'Платежи дня'}</h2>
         <span className="num text-xs text-ink-soft">{day?.occurrences.length ?? 0}</span>

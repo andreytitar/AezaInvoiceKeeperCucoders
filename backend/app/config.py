@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     telegram_polling_enabled: bool = True
     # Публичный адрес панели: одноразовые ссылки из бота ведут сюда
     public_base_url: str = "http://localhost:8000"
+    # URL Telegram Mini App (полная панель). Пусто — PUBLIC_BASE_URL, если он https://
+    telegram_mini_app_url: str | None = None
 
     # --- Email (SMTP) ---
     smtp_host: str | None = None
@@ -88,7 +90,8 @@ class Settings(BaseSettings):
         return v
 
     @field_validator(
-        "telegram_bot_token", "telegram_chat_id", "telegram_bot_username", "app_fake_today",
+        "telegram_bot_token", "telegram_chat_id", "telegram_bot_username", "telegram_mini_app_url",
+        "app_fake_today",
         "smtp_host", "smtp_user", "smtp_password", "chat_webhook_url",
         mode="before",
     )

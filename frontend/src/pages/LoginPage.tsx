@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, ApiError, unwrap } from '../api/client'
+import { BrandLockup } from '../components/BrandLockup'
 import { Footer } from '../components/Footer'
 import { Button, Input } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -14,7 +15,7 @@ function WelcomeCopy() {
       aria-label="О сервисе"
       className="flex min-w-0 flex-col justify-between bg-[#182D48] p-6 text-white min-[900px]:p-10"
     >
-      <div>
+      <div className="login-reveal login-reveal-1">
         <h2 className="max-w-md font-display text-3xl leading-tight font-semibold min-[1100px]:text-[2.5rem]">
           Команда знает,
           <br />
@@ -26,7 +27,7 @@ function WelcomeCopy() {
         </p>
       </div>
       <div className="mt-8 divide-y divide-white/15 min-[900px]:mt-12">
-        <article className="flex gap-4 py-5">
+        <article className="login-reveal login-reveal-2 flex gap-4 py-5">
           <Icon name="calendar" className="mt-0.5 shrink-0 text-[#4CC6F1]" />
           <div>
             <h3 className="font-medium">Расходы на виду</h3>
@@ -35,7 +36,7 @@ function WelcomeCopy() {
             </p>
           </div>
         </article>
-        <article className="flex gap-4 py-5">
+        <article className="login-reveal login-reveal-3 flex gap-4 py-5">
           <Icon name="telegram" className="mt-0.5 shrink-0 text-[#4CC6F1]" />
           <div>
             <h3 className="font-medium">Напоминания за 3 дня</h3>
@@ -44,7 +45,7 @@ function WelcomeCopy() {
             </p>
           </div>
         </article>
-        <article className="flex gap-4 py-5">
+        <article className="login-reveal login-reveal-4 flex gap-4 py-5">
           <Icon name="users" className="mt-0.5 shrink-0 text-[#4CC6F1]" />
           <div>
             <h3 className="font-medium">Одна картина для команды</h3>
@@ -263,12 +264,12 @@ export function LoginPage() {
   return (
     <div className="flex min-h-dvh min-w-0 flex-col bg-paper font-sans text-ink">
       <header className="mx-auto flex w-full max-w-[1160px] items-center justify-between px-5 py-6 min-[650px]:px-8">
-        <span className="font-display text-xl font-semibold tracking-tight">Invoice Keeper</span>
+        <BrandLockup compact />
         <span className="text-xs text-ink-soft">Aeza · 2026</span>
       </header>
       <main className="mx-auto flex w-full max-w-[1160px] flex-1 items-center px-4 pb-8 min-[650px]:px-8">
         <div className="grid w-full min-w-0 overflow-hidden rounded-xl border border-rule bg-paper-2 min-[900px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0 px-5 py-7 min-[650px]:px-8 min-[650px]:py-10 min-[1100px]:px-10">
+          <div className="page-enter min-w-0 px-5 py-7 min-[650px]:px-8 min-[650px]:py-10 min-[1100px]:px-10">
             {phase === 'choices' ? (
               <>
                 <div className="mb-6 inline-flex items-center gap-2 text-sm text-ink-soft">

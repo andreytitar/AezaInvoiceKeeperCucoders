@@ -57,7 +57,7 @@ export function Input({
   return <input {...props} className={`field ${className}`} />
 }
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={`field ${className}`} />
+  return <select {...props} className={`field block w-full min-w-0 max-w-full box-border ${className}`} />
 }
 export function Checkbox({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} type="checkbox" className={`checkbox ${className}`} />
@@ -152,7 +152,7 @@ export function Skeleton({ className = '', ...props }: HTMLAttributes<HTMLDivEle
 }
 export function EmptyState({ title, hint, icon }: { title: string; hint?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="empty-state">
+    <div className="empty-state reveal-up">
       <span className="empty-state-icon" aria-hidden="true">
         {icon ?? <Icon name="wallet" />}
       </span>
@@ -168,14 +168,16 @@ export const Empty = EmptyState
 export function Toast({
   kind,
   children,
+  leaving = false,
   onDismiss,
 }: {
   kind: 'ok' | 'error'
   children: ReactNode
+  leaving?: boolean
   onDismiss: () => void
 }) {
   return (
-    <Card className={`fade-in toast toast-${kind} text-sm`}>
+    <Card className={`toast toast-${kind} text-sm ${leaving ? 'toast-leave' : 'toast-enter'}`}>
       <Icon name={kind === 'ok' ? 'check' : 'bell'} />
       <span className="flex-1">{children}</span>
       <Button variant="ghost" className="icon-button" aria-label="Закрыть уведомление" onClick={onDismiss}>

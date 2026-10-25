@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from urllib.parse import parse_qsl
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -68,6 +70,41 @@ def _canonical(value: object) -> str:
 def data_check_string(fields: dict) -> str:
     lines = [f"{key}={_canonical(fields[key])}" for key in sorted(fields) if key != "hash"]
     return "\n".join(lines)
+
+
+def verify_webapp_init_data(init_data: str, bot_token: str | None, now: datetime) -> int:
+    """Подпись Mini App: HMAC-SHA256(WebAppData, token) как ключ, data-check-string как сообщение."""
+    if not bot_token:
+        raise Unauthorized("Вход через Telegram не настроен")
+    if not init_data or len(init_data) > 4096:
+        raise Unauthorized("Данные Telegram Mini App недействительны")
+    fields = dict(parse_qsl(init_data, keep_blank_values=True))
+    received = fields.get("hash")
+    if not isinstance(received, str) or len(received) != 64:
+        raise Unauthorized("Данные Telegram Mini App недействительны")
+    check = {key: value for key, value in fields.items() if key != "hash"}
+    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    digest = hmac.new(secret, data_check_string(check).encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(digest, received):
+        raise Unauthorized("Данные Telegram Mini App недействительны")
+    try:
+        auth_date = int(fields["auth_date"])
+    except (KeyError, TypeError, ValueError):
+        raise Unauthorized("Данные Telegram Mini App недействительны") from None
+    now_ts = int(now.timestamp())
+    if auth_date > now_ts + 60 or now_ts - auth_date > int(WIDGET_MAX_AGE.total_seconds()):
+        raise Unauthorized("Данные Telegram Mini App устарели, откройте приложение снова")
+    raw_user = fields.get("user")
+    if not isinstance(raw_user, str) or not raw_user:
+        raise Unauthorized("Данные Telegram Mini App недействительны")
+    try:
+        user = json.loads(raw_user)
+        tg_id = int(user["id"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        raise Unauthorized("Данные Telegram Mini App недействительны") from None
+    if tg_id <= 0:
+        raise Unauthorized("Данные Telegram Mini App недействительны")
+    return tg_id
 
 
 def verify_widget(fields: dict, bot_token: str | None, now: datetime) -> int:
@@ -140,6 +177,11 @@ class TelegramWebAuth:
 
     def identify(self, fields: dict) -> TelegramIdentify:
         return self.decide(verify_widget(fields, self.settings.telegram_bot_token, self.clock.now()))
+
+    def identify_webapp(self, init_data: str) -> TelegramIdentify:
+        return self.decide(
+            verify_webapp_init_data(init_data, self.settings.telegram_bot_token, self.clock.now())
+        )
 
     def decide(self, tg_id: int) -> TelegramIdentify:
         """Та же развилка, что у /start без кода: своя команда или экран выбора на сайте."""

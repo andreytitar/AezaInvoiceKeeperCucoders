@@ -77,6 +77,7 @@ export function DashboardPage() {
   const [version, setVersion] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [filterResetVersion, setFilterResetVersion] = useState(0)
+  const [flashId, setFlashId] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -156,6 +157,8 @@ export function DashboardPage() {
         }),
       )
       toast('ok', `«${o.title}» — оплата отмечена`)
+      setFlashId(o.id)
+      window.setTimeout(() => setFlashId((id) => (id === o.id ? null : id)), 400)
       setPaying(null)
       setPending(null)
       refresh()
@@ -272,7 +275,9 @@ export function DashboardPage() {
       {summary.error ? (
         <ErrorNote text={summary.error} onRetry={summary.reload} />
       ) : summary.data ? (
-        <SummaryCards summary={summary.data} />
+        <div className="content-enter">
+          <SummaryCards summary={summary.data} />
+        </div>
       ) : (
         <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="Загрузка итогов" role="status">
           {[0, 1, 2].map((key) => <Card key={key} className="space-y-4 p-5"><Skeleton className="h-4 w-20" /><Skeleton className="h-9 w-3/4" /><Skeleton className="h-20 w-full" /></Card>)}
@@ -310,9 +315,17 @@ export function DashboardPage() {
           <EmptyState title={f.tab === 'overdue' ? 'Просрочек нет' : f.tab === 'topay' ? 'Всё оплачено' : 'Ничего не найдено'} hint={hasExtraFilters ? 'Попробуйте сбросить фильтры' : 'Здесь появятся периоды регулярных платежей'} icon={<Icon name={f.tab === 'overdue' || f.tab === 'topay' ? 'check' : 'search'} />} />
         ) : (
           <>
-            <ul className={`payments-cards divide-y divide-rule border-t border-rule ${list.loading ? 'opacity-60' : ''}`} aria-busy={list.loading}>
-              {list.data.items.map((o) => (
-                <li key={o.id} className="space-y-3 p-4">
+            <ul
+              key={`${f.tab}-${page}`}
+              className={`payments-cards list-enter divide-y divide-rule border-t border-rule ${list.loading ? 'opacity-60' : ''}`}
+              aria-busy={list.loading}
+            >
+              {list.data.items.map((o, index) => (
+                <li
+                  key={o.id}
+                  className={`list-row-enter space-y-3 p-4 ${flashId === o.id ? 'row-paid-flash' : ''}`}
+                  style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+                >
                   <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <span className="min-w-0 font-medium">{o.title}</span>
                     <span className={`num shrink-0 text-right whitespace-nowrap ${amountHot(o) ? 'text-overdue' : ''}`}>{formatMoney(o.amount, o.currency)}</span>
@@ -326,7 +339,11 @@ export function DashboardPage() {
                 </li>
               ))}
             </ul>
-            <Table className={`payments-table w-full ${list.loading ? 'opacity-60' : ''}`} aria-busy={list.loading}>
+            <Table
+              key={`${f.tab}-${page}-table`}
+              className={`payments-table list-enter w-full ${list.loading ? 'opacity-60' : ''}`}
+              aria-busy={list.loading}
+            >
               <thead>
                 <tr>
                   <th aria-sort={ariaSort('title')}><button onClick={() => toggleSort('title')} className="whitespace-nowrap">Название{sortMark('title')}</button></th>
@@ -337,8 +354,12 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.data.items.map((o) => (
-                  <tr key={o.id}>
+                {list.data.items.map((o, index) => (
+                  <tr
+                    key={o.id}
+                    className={`list-row-enter ${flashId === o.id ? 'row-paid-flash' : ''}`}
+                    style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+                  >
                     <td className="min-w-0">
                       <span className="font-medium">{o.title}</span>
                       {o.has_receipt && <Button variant="ghost" size="sm" className="ml-1 align-middle" onClick={() => setReceiptFor(o)} aria-label={`Открыть чек для «${o.title}»`} title="Открыть чек"><Icon name="receipt" /></Button>}

@@ -10,7 +10,11 @@ import logging
 import re
 from typing import Any, Protocol
 
+from app.config import Settings
+
 log = logging.getLogger("app.telegram_profile")
+
+MINI_APP_MENU_TEXT = "Открыть панель"
 
 SHORT_DESCRIPTION = "Напоминает об аренде, подписках и серверах за 3 дня до срока."
 
@@ -47,6 +51,16 @@ class _TelegramApi(Protocol):
 
     async def set_my_commands(self, commands: list[tuple[str, str]]) -> Any: ...
 
+    async def set_chat_menu_button(self, text: str, web_app_url: str, chat_id: int | None = None) -> Any: ...
+
+
+def resolve_mini_app_url(settings: Settings) -> str | None:
+    """HTTPS-адрес полной панели для Mini App. Telegram не принимает http://."""
+    raw = (settings.telegram_mini_app_url or settings.public_base_url or "").strip().rstrip("/")
+    if not raw.lower().startswith("https://"):
+        return None
+    return f"{raw}/"
+
 
 def profile_payloads() -> dict[str, dict[str, Any]]:
     """Тела setMyShortDescription, setMyDescription и setMyCommands. Сеть не вызывается."""
@@ -72,8 +86,8 @@ def profile_payloads() -> dict[str, dict[str, Any]]:
     }
 
 
-async def apply_telegram_profile(client: _TelegramApi) -> None:
-    """Ставит описание и меню один раз. Ошибка пишется в лог и не останавливает воркер."""
+async def apply_telegram_profile(client: _TelegramApi, settings: Settings | None = None) -> None:
+    """Ставит описание, команды и кнопку Mini App. Ошибка пишется в лог и не останавливает воркер."""
     try:
         payloads = profile_payloads()
     except Exception as exc:  # noqa: BLE001
@@ -82,11 +96,24 @@ async def apply_telegram_profile(client: _TelegramApi) -> None:
     short = payloads["setMyShortDescription"]["short_description"]
     description = payloads["setMyDescription"]["description"]
     commands = [(item["command"], item["description"]) for item in payloads["setMyCommands"]["commands"]]
-    steps = (
+    steps: list[tuple[str, Any]] = [
         ("setMyShortDescription", lambda: client.set_my_short_description(short)),
         ("setMyDescription", lambda: client.set_my_description(description)),
         ("setMyCommands", lambda: client.set_my_commands(commands)),
-    )
+    ]
+    if settings is not None:
+        mini_app_url = resolve_mini_app_url(settings)
+        if mini_app_url:
+            steps.append(
+                (
+                    "setChatMenuButton",
+                    lambda url=mini_app_url: client.set_chat_menu_button(MINI_APP_MENU_TEXT, url),
+                )
+            )
+        else:
+            log.info(
+                "кнопка Mini App не задана: нужен https:// в PUBLIC_BASE_URL или TELEGRAM_MINI_APP_URL"
+            )
     for method, start in steps:
         try:
             await start()

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api, onUnauthorized, unwrap, type Me } from '../api/client'
+import { getTelegramWebApp } from '../telegram/webApp'
 
 type AuthState = {
   me: Me | null
@@ -18,12 +19,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.GET('/api/v1/auth/me').then((r) => {
-      setMe(r.response.ok && r.data ? r.data : null)
-      setLoading(false)
-    })
+    let cancelled = false
+    const finish = (user: Me | null) => {
+      if (!cancelled) {
+        setMe(user)
+        setLoading(false)
+      }
+    }
+
+    ;(async () => {
+      const meRes = await api.GET('/api/v1/auth/me')
+      if (cancelled) return
+      if (meRes.response.ok && meRes.data) {
+        finish(meRes.data)
+        return
+      }
+      const webApp = getTelegramWebApp()
+      if (webApp?.initData) {
+        try {
+          const data = unwrap(
+            await api.POST('/api/v1/auth/telegram/webapp', { body: { init_data: webApp.initData } }),
+          )
+          if (data.status === 'authenticated' && data.user) {
+            finish(data.user)
+            return
+          }
+        } catch {
+          /* остаёмся на экране входа */
+        }
+      }
+      finish(null)
+    })()
+
     const off = onUnauthorized(() => setMe(null))
     return () => {
+      cancelled = true
       off()
     }
   }, [])

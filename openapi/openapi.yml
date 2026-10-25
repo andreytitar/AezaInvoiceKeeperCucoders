@@ -209,6 +209,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TelegramPendingOut'
+  /api/v1/auth/telegram/webapp:
+    post:
+      tags:
+      - auth
+      summary: Вход из Telegram Mini App (initData)
+      description: Проверяет подпись initData (HMAC-SHA256 с ключом WebAppData). Та же развилка, что у Login Widget.
+      operationId: telegram_webapp_login_api_v1_auth_telegram_webapp_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramWebAppAuth'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramLoginResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/telegram:
     post:
       tags:
@@ -3357,6 +3389,18 @@ components:
       - chat_source
       - me_linked
       title: TelegramStatus
+    TelegramWebAppAuth:
+      properties:
+        init_data:
+          type: string
+          maxLength: 4096
+          minLength: 1
+          title: Init Data
+          description: Строка window.Telegram.WebApp.initData
+      type: object
+      required:
+      - init_data
+      title: TelegramWebAppAuth
     TelegramWidgetAuth:
       properties:
         id:

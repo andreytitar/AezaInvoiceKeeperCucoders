@@ -175,6 +175,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/telegram/webapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Вход из Telegram Mini App (initData)
+         * @description Проверяет подпись initData (HMAC-SHA256 с ключом WebAppData). Та же развилка, что у Login Widget.
+         */
+        post: operations["telegram_webapp_login_api_v1_auth_telegram_webapp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/telegram": {
         parameters: {
             query?: never;
@@ -1556,6 +1576,14 @@ export interface components {
             /** Me Linked */
             me_linked: boolean;
         };
+        /** TelegramWebAppAuth */
+        TelegramWebAppAuth: {
+            /**
+             * Init Data
+             * @description Строка window.Telegram.WebApp.initData
+             */
+            init_data: string;
+        };
         /**
          * TelegramWidgetAuth
          * @description Поля Telegram Login Widget. Лишние ключи сохраняются: они входят в подпись.
@@ -2073,6 +2101,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TelegramPendingOut"];
+                };
+            };
+        };
+    };
+    telegram_webapp_login_api_v1_auth_telegram_webapp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramWebAppAuth"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginResponse"];
+                };
+            };
+            /** @description Не авторизован */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
